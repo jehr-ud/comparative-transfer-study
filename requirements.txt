@@ -1,0 +1,12 @@
+gymnasium==0.29.1
+stable-baselines3
+numpy
+shimmy
+gymnasium[classic-control]
+imitation
+pygame
+shimmy
+stable-baselines3 
+matplotlib
+pandas
+seaborn
