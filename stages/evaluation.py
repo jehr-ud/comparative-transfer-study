@@ -21,7 +21,7 @@ def evaluate_agent(
         while not done:
             action, _states = model.predict(obs, **params_predict)
             print("States", _states)
-            obs, reward, done, _, info = env.step(action)
+            obs, reward, done, info = env.step(action)
             reward = float(reward)
             episode_reward += reward
 

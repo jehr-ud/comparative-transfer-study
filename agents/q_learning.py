@@ -68,17 +68,22 @@ class QLearning:
             self.epsilon = max(self.epsilon_min, self.epsilon * self.epsilon_decay)
 
     def predict(self, state, deterministic=True):
+        if isinstance(state, (list, np.ndarray)) and len(state) == 1:
+            state = state[0]  # extract [[...]] → [...]
+
         discrete_state = self.discretize(state)
+
         if deterministic:
-            action = np.argmax(self.q_table[discrete_state])
+            action = int(np.argmax(self.q_table[discrete_state]))
         else:
-            action = self.env.action_space.sample()
+            action = int(self.env.action_space.sample())
 
         info = {
             "state": discrete_state,
             "q_values": self.q_table[discrete_state]
         }
-        return action, info
+
+        return [action], info
 
     def save(self, filename):
         """
@@ -100,18 +105,27 @@ class QLearning:
             print(f"El archivo {filename} no existe.")
 
     def update(self, state, action, reward, next_state, done):
-        state = self.discretize(state)
-        next_state = self.discretize(next_state)
+        def scalarize(x):
+            # Convierte arrays o listas de un solo valor a enteros
+            if isinstance(x, (np.ndarray, list)) and len(x) == 1:
+                return int(x[0])
+            elif isinstance(x, np.ndarray):
+                return int(x.item()) if x.size == 1 else int(x.flat[0])  # Primer valor
+            return int(x)
 
-        # Asegúrate de que los índices no estén fuera de los límites
-        if state[0] >= self.q_table.shape[0] or next_state[0] >= self.q_table.shape[0]:
+        # Asegura que todos los valores estén en forma escalar (enteros)
+        state = tuple(scalarize(s) for s in self.discretize(state))
+        next_state = tuple(scalarize(s) for s in self.discretize(next_state))
+
+        # Validar índices
+        if any(s >= dim for s, dim in zip(state, self.q_table.shape[:-1])) or \
+        any(s >= dim for s, dim in zip(next_state, self.q_table.shape[:-1])):
             print(f"Índices fuera de rango: {state}, {next_state}")
             return
 
         old_value = self.q_table[state][action]
         next_max = np.max(self.q_table[next_state])
-
-        # Regla de actualización Q-Learning
         new_value = old_value + self.alpha * (reward + self.gamma * next_max * (1 - int(done)) - old_value)
         self.q_table[state][action] = new_value
+
 

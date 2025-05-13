@@ -18,7 +18,7 @@ def train_q_learning_agent(model, model_name, env, difficulty, num_episodes=1000
 
         for _ in range(max_steps_per_episode):
             action, _ = model.predict(state, deterministic=False)
-            next_state, reward, done, _, info = env.step(action)
+            next_state, reward, done, info = env.step(action)
             print("Information of step", info)
 
             if isinstance(next_state, tuple):  # En caso de que también next_state sea una tupla

@@ -11,20 +11,27 @@ from stages.train.agents.base_q_learning_agent import train_q_learning_agent
 
 envs = {
     "simple": {
-        "train": create_env("simple", vectorize=False),
-        "validation": create_env("simple", render=True, vectorize=False)
+        "train": create_env("simple"),
+        "validation": create_env("simple", render=True)
     },
     "medium": {
-        "train": create_env("medium", vectorize=False),
-        "validation": create_env("medium", render=True, vectorize=False)
+        "train": create_env("medium"),
+        "validation": create_env("medium", render=True)
     },
     "complex": {
-        "train": create_env("complex", vectorize=False),
-        "validation": create_env("complex", render=True, vectorize=False)
+        "train": create_env("complex"),
+        "validation": create_env("complex", render=True)
     },
 }
 
 algorithms2 = [
+    {
+        "name": "Q-Learning",
+        "class": QLearning,
+        "train_function": train_q_learning_agent,
+        "params_predict": {"deterministic": True},
+        "type": "classical"
+    },
     {
         "name": "DQN",
         "class": DQN,
@@ -56,10 +63,12 @@ algorithms2 = [
 
 algorithms = [
     {
-        "name": "Q-Learning",
-        "class": QLearning,
-        "train_function": train_q_learning_agent,
-        "params_predict": {"deterministic": True},
+        "name": "DQN",
+        "class": DQN,
+        "train_function": train_sb_agent,
+        "params_predict": {
+            "deterministic": True
+        },
         "type": "classical"
     }
 ]

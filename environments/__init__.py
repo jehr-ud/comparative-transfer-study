@@ -4,7 +4,7 @@ from stable_baselines3.common.monitor import Monitor
 from environments.drivers.visual_maze_env import VisualMazeEnv
 
 
-def create_env(name, render=False, name_file=None, vectorize=True):
+def create_env(name, render=False, name_file=None):
     render_mode = "human" if render else None
 
     if name == 'simple':
@@ -30,13 +30,9 @@ def create_env(name, render=False, name_file=None, vectorize=True):
 
     print("Env was created......")
 
-    filename = f"visualmaze_{name}"
+    filename = f"results/visualmaze_{name}"
     if name_file:
         filename = name_file
 
     env = Monitor(env, filename=filename)
-
-    if vectorize:
-        env = DummyVecEnv([lambda: env])  # for SB3 agents
-
-    return env
+    return DummyVecEnv([lambda: env])

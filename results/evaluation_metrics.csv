@@ -1,10 +1,3 @@
-Model,Env Size,Success Rate,Average Reward
-models\{model}_simple,6,1.0,0.9100000020116568
-models\{model}_simple,8,1.0,0.8700000029057264
-models\{model}_simple,12,1.0,0.7900000046938658
-models\{model}_medium,6,0.0,-198.670002957806
-models\{model}_medium,8,1.0,0.8700000029057264
-models\{model}_medium,12,0.0,-196.7700029257685
-models\{model}_complex,6,0.0,-199.0500029642135
-models\{model}_complex,8,0.0,-199.24000296741724
-models\{model}_complex,12,1.0,0.7900000046938658
+Episode,Reward,Success,Timeout
+1,-38.39000057987869,0,0
+2,-14.570000225678086,0,0
