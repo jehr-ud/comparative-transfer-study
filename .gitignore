@@ -1,0 +1,60 @@
+# Byte-compiled / optimized / DLL files
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Entornos virtuales
+venv/
+.env/
+.venv/
+env/
+
+# Jupyter Notebooks checkpoints
+.ipynb_checkpoints/
+
+# Archivos de configuración de entorno
+.env
+*.env
+
+# Archivos de log y resultados
+*.log
+*.out
+*.csv
+*.pkl
+*.json
+
+# Archivos temporales
+*.tmp
+*.temp
+*.bak
+*.swp
+
+# Carpetas de VSCode, PyCharm u otros IDEs
+.vscode/
+.idea/
+
+# Configuración de pytest, coverage, mypy
+.mypy_cache/
+.pytest_cache/
+.coverage
+htmlcov/
+.cache/
+.tox/
+
+# Modelos entrenados y artefactos
+models/
+checkpoints/
+runs/
+tb_logs/
+saved_models/
+experiments/
+videos/
+
+# Gym outputs
+*.monitor.csv
+*.mp4
+*.gif
+
+# Archivos de datos pesados
+data/
+datasets/
