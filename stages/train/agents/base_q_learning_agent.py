@@ -1,12 +1,11 @@
-import pickle
-import os
-
 from agents.q_learning import QLearning
 
 
-def train_q_learning_agent(model, model_name, env, difficulty, num_episodes=1000, max_steps_per_episode=200, model_path="results/q_table.pkl"):
+def train_q_learning_agent(model, model_name, env, difficulty, num_episodes=1000, max_steps_per_episode=200):
     model: QLearning = model(env)
     episode_rewards = []
+
+    print(f"Train: {model_name} in {difficulty}")
 
     for episode in range(num_episodes):
         state = env.reset()
@@ -36,6 +35,7 @@ def train_q_learning_agent(model, model_name, env, difficulty, num_episodes=1000
         if (episode + 1) % 500 == 0:
             print(f"Episode {episode + 1}: Total Reward: {total_reward}, Epsilon: {model.epsilon:.4f}")
 
+    model_path = f"models/{model_name}_{difficulty}.pkl"
     model.save(model_path)
 
     return model, episode_rewards

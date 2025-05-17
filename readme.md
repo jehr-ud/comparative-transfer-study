@@ -8,7 +8,7 @@ This project implements training, evaluation, and transfer learning using popula
 ## 📁 Project Structure
 
 ├── agents/
-│ ├── base_agent.py # Training and evaluation logic for Stable-Baselines3 agents
+│ ├── q_learning.py # Training logic for this algorithm
 │
 ├── environments/
 │ └── init.py
@@ -17,6 +17,8 @@ This project implements training, evaluation, and transfer learning using popula
 │
 ├── stages/
 │ ├── evaluation.py # Evaluation and transfer learning functions
+│ ├── comparation.py # Generate the comparation 
+│ │── train/ # functions to train agents
 │
 ├── results/
 ├── learning_curves.csv # CSV output with reward curves
@@ -55,6 +57,12 @@ pip install -r requirements.txt
 
 ### 🚀 Running the Project
 
+Modify this file:
+
+```
+config/__init__.py
+```
+
 ```bash
 python main.py
 ```
@@ -76,6 +84,7 @@ In models/
 - DQN
 - PPO
 - A2C
+- QLearning
 
 
 ## 📚 Requirements

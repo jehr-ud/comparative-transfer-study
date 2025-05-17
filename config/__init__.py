@@ -74,13 +74,23 @@ algorithms = [
 ]
 
 transfer_envs = [
-    DummyVecEnv([lambda: VisualMazeEnv(size=6, obstacles=[(1, 1), (2, 3), (3, 1)])]),
-    DummyVecEnv([lambda: VisualMazeEnv(size=8, obstacles=[(1, 2), (2, 4), (5, 5), (6, 3)])]),
-    DummyVecEnv([lambda: VisualMazeEnv(size=12, obstacles=[(2, 2), (3, 7), (6, 6), (8, 9), (10, 4)])]),
-]
-
-model_paths = [
-    str(Path("models") / "{model}_simple"),
-    str(Path("models") / "{model}_medium"),
-    str(Path("models") / "{model}_complex"),
+    {
+        "source": {
+            "env": create_env("medium"),
+            "name": "Medium"
+        },
+        "target_model_paths": [
+            {"name": "simple", "path": str(Path("models") / "{model}_simple")},
+        ]
+    },
+    {
+        "source": {
+            "env": create_env("complex"),
+            "name": "Complex"
+        },
+        "target_model_paths": [
+            {"name": "simple", "path": str(Path("models") / "{model}_simple")},
+            {"name": "Medium", "path": str(Path("models") / "{model}_medium")},
+        ]
+    }
 ]

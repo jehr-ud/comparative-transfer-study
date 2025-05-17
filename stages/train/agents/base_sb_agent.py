@@ -2,7 +2,7 @@ import os
 import numpy as np
 
 
-def get_model_params(model_name, difficulty):
+def get_sb_model_params(model_name, difficulty):
     configs = {
         "DQN": {
             "simple":  {"total_timesteps": 50000, "learning_rate": 1e-3, "buffer_size": 10000, "batch_size": 32},
@@ -25,7 +25,7 @@ def get_model_params(model_name, difficulty):
 
 def train_sb_agent(model_class, model_name, env, difficulty, save_path="./models"):
     # configurations
-    params = get_model_params(model_name, difficulty)
+    params = get_sb_model_params(model_name, difficulty)
     total_timesteps = params.get('total_timesteps', 1000)
     del params['total_timesteps']
 
