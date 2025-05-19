@@ -1,13 +1,23 @@
 from pathlib import Path
 
 from stable_baselines3 import DQN, PPO, A2C
-from stable_baselines3.common.vec_env import DummyVecEnv
 
 from agents.q_learning import QLearning
-from environments import create_env, VisualMazeEnv
+from environments import create_env
 from stages.train.agents.base_sb_agent import train_sb_agent
 from stages.train.agents.base_q_learning_agent import train_q_learning_agent
 
+
+envs1 = {
+    "simple": {
+        "train": create_env("simple"),
+        "validation": create_env("simple", render=True)
+    },
+    "medium": {
+        "train": create_env("medium"),
+        "validation": create_env("medium", render=True)
+    },
+}
 
 envs = {
     "simple": {
@@ -24,7 +34,7 @@ envs = {
     },
 }
 
-algorithms2 = [
+classical_algorithms = [
     {
         "name": "Q-Learning",
         "class": QLearning,
@@ -48,7 +58,7 @@ algorithms2 = [
         "params_predict": {
             "deterministic": True
         },
-        "type": "base"
+        "type": "classical"
     },
     {
         "name": "A2C",
@@ -61,16 +71,23 @@ algorithms2 = [
     },
 ]
 
-algorithms = [
+transfer_algorithms = [
     {
-        "name": "DQN",
-        "class": DQN,
+        "name": "Q-Learning",
+        "class": QLearning,
+        "train_function": train_q_learning_agent,
+        "params_predict": {"deterministic": True},
+        "type": "classical"
+    },
+    {
+        "name": "PPO",
+        "class": PPO,
         "train_function": train_sb_agent,
         "params_predict": {
             "deterministic": True
         },
         "type": "classical"
-    }
+    },
 ]
 
 transfer_envs = [
