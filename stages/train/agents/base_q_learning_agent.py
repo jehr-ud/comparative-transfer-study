@@ -1,18 +1,36 @@
 from agents.q_learning import QLearning
 
 
+TRAINING_CONFIG = {
+    "simple": {
+        "num_episodes": 1000,
+        "max_steps_per_episode": 100
+    },
+    "medium": {
+        "num_episodes": 2000,
+        "max_steps_per_episode": 200
+    },
+    "complex": {
+        "num_episodes": 3000,
+        "max_steps_per_episode": 300
+    }
+}
+
+
 def train_q_learning_agent(
     model,
     model_name,
     env,
-    difficulty,
-    num_episodes=1000,
-    max_steps_per_episode=200
+    difficulty
 ):
     model: QLearning = model(env)
     episode_rewards = []
 
     print(f"Train: {model_name} in {difficulty}")
+
+    config = TRAINING_CONFIG.get(difficulty, TRAINING_CONFIG["simple"])
+    num_episodes = config["num_episodes"]
+    max_steps_per_episode = config["max_steps_per_episode"]
 
     for episode in range(num_episodes):
         state = env.reset()

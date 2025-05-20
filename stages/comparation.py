@@ -8,7 +8,8 @@ from stages.evaluation import (
 
 def run_training_and_evaluation(
     envs,
-    algorithms: list
+    algorithms: list,
+    type_algorithms: str
 ):
 
     for env_name, env_pair in envs.items():
@@ -31,16 +32,26 @@ def run_training_and_evaluation(
             print("✅ Training finished")
 
             print("📊 Evaluation starting..")
+
+            file_results = f"{algo_name}_{env_name}_metrics.csv"
+            path = f"results/{type_algorithms}/{file_results}"
             evaluate_agent(
                 agent,
                 env_pair['validation'],
-                filename=f"results/{algo_name}_{env_name}_metrics.csv",
+                path,
                 params_predict=algorithm.get('params_predict')
             )
             print("📊 Evaluation finished")
 
-        plot_learning_curves(env_name, curves_dict, output_file=f"results/learning_curves_{env_name}.png")
-        save_learning_curves(curves_dict, filename=f"results/learning_curves_{env_name}.csv")
+        plot_learning_curves(
+            env_name,
+            curves_dict,
+            f"results/{type_algorithms}/learning_curves_{env_name}.png"
+        )
+        save_learning_curves(
+            curves_dict,
+            f"results/{type_algorithms}/learning_curves_{env_name}.csv"
+        )
 
     return curves_dict
 
@@ -57,4 +68,5 @@ def run_transfer_comparation(
                 algorithm.get('name'),
                 algorithm.get('class'),
                 transfer_envs,
+                "transfer"
             )

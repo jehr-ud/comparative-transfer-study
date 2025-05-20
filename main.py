@@ -5,6 +5,7 @@ from stages.comparation import (
 from config import (
     envs,
     classical_algorithms,
+    classical_transfer_envs,
     transfer_envs,
     transfer_algorithms
 )
@@ -12,14 +13,14 @@ from config import (
 
 def run_classical_methods():
     print("🎯 Running classical methods...")
-    run_training_and_evaluation(envs, classical_algorithms)
-    run_transfer_comparation(classical_algorithms, transfer_envs)
+    run_training_and_evaluation(envs, classical_algorithms, "classical")
+    run_transfer_comparation(classical_algorithms, classical_transfer_envs)
 
 
 def run_transfer_methods():
     print("🎁 Running transfer methods...")
-    run_training_and_evaluation(envs, transfer_algorithms)
-    run_transfer_comparation(classical_algorithms, transfer_algorithms)
+    run_training_and_evaluation(envs, transfer_algorithms, "transfer")
+    run_transfer_comparation(classical_algorithms, transfer_envs)
 
 
 if __name__ == "__main__":

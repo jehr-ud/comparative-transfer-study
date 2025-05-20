@@ -3,7 +3,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 
 
-def evaluate_agent(model, env, num_episodes=100, filename='results/evaluation_metrics.csv', params_predict={}):
+def evaluate_agent(model, env, filename, num_episodes=100, params_predict={}):
     episode_data = []
     success_count = 0
     convergence_episode = None
@@ -49,7 +49,8 @@ def evaluate_agent(model, env, num_episodes=100, filename='results/evaluation_me
     success_rate = success_count / num_episodes
     average_reward = np.mean(total_rewards)
     average_steps = np.mean(total_steps)
-    convergence_speed = convergence_episode if convergence_episode is not None else "Not reached"
+    convergence_speed = convergence_episode if \
+        convergence_episode is not None else 0  # Not reached
 
     # Save episode-level data
     fieldnames = ["Episode", "Reward", "Success", "Timeout", "Steps"]
@@ -78,11 +79,8 @@ def evaluate_agent(model, env, num_episodes=100, filename='results/evaluation_me
     plot_metrics({
         "Success Rate": success_rate,
         "Average Reward": average_reward,
-        "Average Steps": average_steps / max(total_steps),  # Normalize for plotting
+        "Average Steps": average_steps / max(total_steps),  # Normalize
     }, "results/evaluation_metrics_plot.png")
-
-    # Plot rewards over episodes
-    plot_episode_rewards(episode_data, "results/evaluation_reward_per_episode.png")
 
     return {
         "success_rate": success_rate,
@@ -106,21 +104,6 @@ def plot_metrics(metrics_dict, save_path):
     plt.close()
 
 
-def plot_episode_rewards(episode_data, save_path):
-    episodes = [d["Episode"] for d in episode_data]
-    rewards = [d["Reward"] for d in episode_data]
-
-    plt.figure(figsize=(10, 5))
-    plt.plot(episodes, rewards, label='Reward', color='orange')
-    plt.xlabel("Episode")
-    plt.ylabel("Reward")
-    plt.title("Reward per Episode (Evaluation)")
-    plt.grid(True)
-    plt.tight_layout()
-    plt.savefig(save_path)
-    plt.close()
-
-
 def load_model(model_path, model_class, env=None):
     if model_class.__name__ == "QLearning":
         assert env is not None, "QLearning needs an environment to load."
@@ -135,43 +118,53 @@ def evaluate_transfer_learning(
     model_name,
     model_class,
     environments,
+    type_algorithms,
     num_episodes=10
 ):
     """
-    Evaluate a model across different environments and save performance metrics.
+    Evaluate a model across different environments
+    and save performance metrics.
     """
     all_results = []
 
     for env_info in environments:
-        source_env = env_info.get('source')
-        for model_info in env_info.get('target_model_paths'):
-            env_label = model_info.get('name')
-            model_path_template = model_info.get('path')
+        target_env = env_info.get('target')
+        name_env = env_info.get('name')
+        for source_model in env_info.get('source_model_paths'):
+            env_label = source_model.get('name')
+            model_path_template = source_model.get('path')
             model_path = model_path_template.format(model=model_name)
 
-            loaded_model = load_model(model_path, model_class, source_env.get('env'))
+            loaded_model = load_model(
+                model_path,
+                model_class,
+                target_env.get('env')
+            )
+            name_file = f"{model_name}_{env_label}_metrics.csv"
+            file = f'results/{type_algorithms}/{name_file}'
             metrics = evaluate_agent(
                 loaded_model,
-                source_env.get('env'),
+                target_env.get('env'),
+                file,
                 num_episodes,
-                filename=f'results/{model_name}_{env_label}_metrics.csv'
             )
 
             result = {
-                'Target Env': source_env.get('name'),
+                'Target Env': target_env.get('name'),
                 'Model': model_name,
                 'Env Name': env_label,
-                'Env Size': source_env.get('env').envs[0].size
+                'Env Size': target_env.get('env').envs[0].size
             }
             result.update(metrics)
 
             all_results.append(result)
 
-    filename = f"results/{model_name}_evaluation_metrics.csv"
+    filename = f"{name_env}_transfer_evaluation_metrics.csv"
+    filename = f"results/{type_algorithms}/{filename}"
 
     save_transfer_results(all_results, filename)
     print_transfer_summary(all_results)
-    plot_transfer_metrics(all_results)
+    plot_transfer_metrics(all_results, type_algorithms)
 
 
 def save_transfer_results(results, filename):
@@ -188,18 +181,24 @@ def save_transfer_results(results, filename):
 def print_transfer_summary(results):
     """Print the evaluation results in a readable format."""
     for r in results:
-        print(f"📊 Model: {r['Model']}, Env: {r['Env Name']}, Size: {r['Env Size']}, "
-              f"Success Rate: {r.get('Success Rate', 0):.2f}, "
+        print(f"📊 Model: {r['Model']}, Env: {r['Env Name']}")
+        print("Size: {r['Env Size']} ")
+        print(f"Success Rate: {r.get('Success Rate', 0):.2f}, "
               f"Avg Reward: {r.get('Average Reward', 0):.2f}")
 
 
-def plot_transfer_metrics(results):
-    """Plot comparison charts for each metric across models and environment sizes."""
+def plot_transfer_metrics(results, type_algorithms):
+    """ Plot comparison charts for each metric
+        across models and environment sizes.
+    """
     if not results:
         return
 
     models = sorted(set(r['Model'] for r in results))
-    metric_names = [key for key in results[0].keys() if key not in {'Model', 'Env Name', 'Env Size'}]
+    metric_names = [
+        key for key in results[0].keys() if key not in
+        {'Model', 'Env Name', 'Env Size'}
+    ]
 
     for metric in metric_names:
         plt.figure(figsize=(10, 6))
@@ -214,10 +213,10 @@ def plot_transfer_metrics(results):
         plt.legend()
         plt.tight_layout()
         safe_metric = metric.replace(" ", "_").lower()
-        plt.savefig(f'results/{safe_metric}_comparison.png')
+        plt.savefig(f'results/{type_algorithms}/{safe_metric}_comparison.png')
 
 
-def plot_learning_curves(env_name, curves_dict, output_file="results/learning_curves.png"):
+def plot_learning_curves(env_name, curves_dict, output_file):
     plt.figure(figsize=(12, 6))
     for label, rewards in curves_dict.items():
         plt.plot(rewards, label=label)
@@ -230,7 +229,7 @@ def plot_learning_curves(env_name, curves_dict, output_file="results/learning_cu
     plt.savefig(output_file)
 
 
-def save_learning_curves(curves_dict, filename="results/learning_curves.csv"):
+def save_learning_curves(curves_dict, filename):
     with open(filename, mode='w', newline='') as f:
         writer = csv.writer(f)
         writer.writerow(['Algorithm', 'Episode', 'Reward'])
