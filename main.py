@@ -2,6 +2,7 @@ from stages.comparation import (
     run_training_and_evaluation,
     run_transfer_comparation
 )
+from stages.usage import show_agent
 from config import (
     envs,
     classical_algorithms,
@@ -25,14 +26,26 @@ def run_transfer_methods():
 
 if __name__ == "__main__":
     choice = input(
-        "What do you want to run? (classical / transfer / both): "
+            "What do you want to run? (classical / transfer): "
+        ).strip().lower()
+
+    need_run_experiments = input(
+        "do you want to train? (y/n): "
     ).strip().lower()
 
-    if choice == "classical":
-        run_classical_methods()
-    elif choice == "transfer":
-        run_transfer_methods()
+    if need_run_experiments == "y":
+        if choice == "classical":
+            run_classical_methods()
+        elif choice == "transfer":
+            run_transfer_methods()
+    elif need_run_experiments == "n":
+        difficulty = input(
+            "What do you want to show? (simple / medium / complex): "
+        ).strip().lower()
+
+        if choice == "classical":
+            show_agent(classical_algorithms, difficulty)
+        elif choice == "transfer":
+            show_agent(transfer_algorithms, difficulty)
     else:
-        print("Invalid or empty option. Running both methods...")
-        run_classical_methods()
-        run_transfer_methods()
+        print("bye")

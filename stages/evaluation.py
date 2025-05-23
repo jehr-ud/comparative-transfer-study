@@ -1,9 +1,19 @@
 import csv
+
 import matplotlib.pyplot as plt
 import numpy as np
 
+from .utils import load_model
 
-def evaluate_agent(model, env, filename, num_episodes=100, params_predict={}):
+
+def evaluate_agent(
+    model,
+    env,
+    filename,
+    type_algorithms,
+    num_episodes=100,
+    params_predict={}
+):
     episode_data = []
     success_count = 0
     convergence_episode = None
@@ -49,8 +59,9 @@ def evaluate_agent(model, env, filename, num_episodes=100, params_predict={}):
     success_rate = success_count / num_episodes
     average_reward = np.mean(total_rewards)
     average_steps = np.mean(total_steps)
-    convergence_speed = convergence_episode if \
-        convergence_episode is not None else 0  # Not reached
+    convergence_speed = (
+        convergence_episode if convergence_episode is not None else 0
+    )
 
     # Save episode-level data
     fieldnames = ["Episode", "Reward", "Success", "Timeout", "Steps"]
@@ -80,7 +91,7 @@ def evaluate_agent(model, env, filename, num_episodes=100, params_predict={}):
         "Success Rate": success_rate,
         "Average Reward": average_reward,
         "Average Steps": average_steps / max(total_steps),  # Normalize
-    }, "results/evaluation_metrics_plot.png")
+    }, f"results/{type_algorithms}/evaluation_metrics_plot.png")
 
     return {
         "success_rate": success_rate,
@@ -104,16 +115,6 @@ def plot_metrics(metrics_dict, save_path):
     plt.close()
 
 
-def load_model(model_path, model_class, env=None):
-    if model_class.__name__ == "QLearning":
-        assert env is not None, "QLearning needs an environment to load."
-        model = model_class(env)
-        model.load(model_path)
-        return model
-    else:
-        return model_class.load(model_path)
-
-
 def evaluate_transfer_learning(
     model_name,
     model_class,
@@ -133,7 +134,9 @@ def evaluate_transfer_learning(
         for source_model in env_info.get('source_model_paths'):
             env_label = source_model.get('name')
             model_path_template = source_model.get('path')
-            model_path = model_path_template.format(model=model_name)
+            model_path = model_path_template.format(
+                model=model_name
+            )
 
             loaded_model = load_model(
                 model_path,
@@ -146,6 +149,7 @@ def evaluate_transfer_learning(
                 loaded_model,
                 target_env.get('env'),
                 file,
+                type_algorithms,
                 num_episodes,
             )
 

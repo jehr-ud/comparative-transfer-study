@@ -3,43 +3,38 @@ from pathlib import Path
 from stable_baselines3 import DQN, PPO, A2C
 
 from agents.q_learning import QLearning
-from agents.imitation_agent import ImitationTransfer
-from agents.cross_domain import CrossDomainTransfer
+#from agents.imitation_agent import ImitationTransfer
+#from agents.cross_domain import CrossDomainTransfer
 from environments import create_env
+
 from stages.train.agents.base_sb_agent import train_sb_agent
 from stages.train.agents.base_q_learning_agent import train_q_learning_agent
-from stages.train.agents.imitation_transfer import (
-    train_imitation_transfer_agent
-)
-from stages.train.agents.cross_domain_transfer import (
-    train_cross_domain_transfer_agent
-)
+#from stages.train.agents.imitation_transfer import (
+#    train_imitation_transfer_agent
+#)
+#from stages.train.agents.cross_domain_transfer import (
+#    train_cross_domain_transfer_agent
+#)
 
-envs1 = {
-    "simple": {
-        "train": create_env("simple"),
-        "validation": create_env("simple", render=True)
-    },
-    "medium": {
-        "train": create_env("medium"),
-        "validation": create_env("medium", render=True)
-    },
-}
+simple_env = create_env("simple")
+medium_env = create_env("medium")
+complex_env = create_env("complex")
 
-envs = {
-    "simple": {
-        "train": create_env("simple"),
-        "validation": create_env("simple", render=True)
+
+envs = [
+    {
+        "name": "simple",
+        "env": simple_env
     },
-    "medium": {
-        "train": create_env("medium"),
-        "validation": create_env("medium", render=True)
+    {
+        "name": "medium",
+        "env": medium_env
     },
-    "complex": {
-        "train": create_env("complex"),
-        "validation": create_env("complex", render=True)
-    },
-}
+    {
+        "name": "complex",
+        "env": complex_env
+    }
+]
 
 classical_algorithms = [
     {
@@ -53,28 +48,22 @@ classical_algorithms = [
         "name": "DQN",
         "class": DQN,
         "train_function": train_sb_agent,
-        "params_predict": {
-            "deterministic": True
-        },
-        "type": "classical"
+        "params_predict": {"deterministic": True},
+        "type": "classical",
     },
     {
         "name": "PPO",
         "class": PPO,
         "train_function": train_sb_agent,
-        "params_predict": {
-            "deterministic": True
-        },
-        "type": "classical"
+        "params_predict": {"deterministic": True},
+        "type": "classical",
     },
     {
         "name": "A2C",
         "class": A2C,
         "train_function": train_sb_agent,
-        "params_predict": {
-            "deterministic": True
-        },
-        "type": "classical"
+        "params_predict": {"deterministic": True},
+        "type": "classical",
     },
 ]
 
@@ -84,69 +73,95 @@ transfer_algorithms = [
         "class": ImitationTransfer,
         "train_function": train_imitation_transfer_agent,
         "params_predict": {},
-        "type": "transfer"
+        "params_train": {
+            "expert": {
+                "model": "PPO",
+                "path": str(Path("models") / "{model}_{env}")
+            },
+        },
+        "type": "transfer",
     },
     {
         "name": "CrossDomain",
         "class": CrossDomainTransfer,
         "train_function": train_cross_domain_transfer_agent,
         "params_predict": {},
-        "type": "transfer"
+        "params_train": {
+            "expert": {
+                "model": "PPO",
+                "path": str(Path("models") / "{model}_{env}")
+            },
+        },
+        "type": "transfer",
     },
 ]
 
 classical_transfer_envs = [
     {
         "target": {
-            "env": create_env("medium"),
-            "name": "Medium"
+            "env": medium_env,
+            "name": "Medium",
         },
         "source_model_paths": [
-            {"name": "Simple", "path": str(Path("models") / "{model}_simple")},
-        ]
+            {
+                "name": "Simple",
+                "path": str(Path("models") / "{model}_simple"),
+            },
+        ],
     },
     {
         "target": {
-            "env": create_env("complex"),
-            "name": "Complex"
+            "env": complex_env,
+            "name": "Complex",
         },
         "source_model_paths": [
-            {"name": "Simple", "path": str(Path("models") / "{model}_simple")},
-            {"name": "Medium", "path": str(Path("models") / "{model}_medium")},
-        ]
-    }
+            {
+                "name": "Simple",
+                "path": str(Path("models") / "{model}_simple"),
+            },
+            {
+                "name": "Medium",
+                "path": str(Path("models") / "{model}_medium"),
+            },
+        ],
+    },
 ]
-
 
 transfer_envs = [
     {
         "target": {
-            "env": create_env("simple"),
-            "name": "Simple"
+            "env": simple_env,
+            "name": "Simple",
         },
         "source_model_paths": [
-            {"name": "simple", "path": str(Path("models") / "{model}_simple")},
-        ]
+            {
+                "name": "simple",
+                "path": str(Path("models") / "{model}_simple"),
+            },
+        ],
     },
     {
         "target": {
-            "env": create_env("medium"),
-            "name": "Medium"
+            "env": medium_env,
+            "name": "Medium",
         },
         "source_model_paths": [
-            {"name": "medium", "path": str(Path("models") / "{model}_medium")},
-        ]
+            {
+                "name": "medium",
+                "path": str(Path("models") / "{model}_medium"),
+            },
+        ],
     },
     {
         "target": {
-            "env": create_env("complex"),
-            "name": "Complex"
+            "env": complex_env,
+            "name": "Complex",
         },
         "source_model_paths": [
             {
                 "name": "Complex",
-                "path": str(Path("models") / "{model}_complex")
-            }
-        ]
-    }
+                "path": str(Path("models") / "{model}_complex"),
+            },
+        ],
+    },
 ]

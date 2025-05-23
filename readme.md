@@ -34,6 +34,8 @@ This project implements training, evaluation, and transfer learning using popula
 
 ## 🛠️ Installation
 
+require python 3.10
+
 ### 1. Clone the repository
 
 - clone the repo
