@@ -8,7 +8,7 @@ from .utils import load_model
 
 def evaluate_agent(
     model,
-    env,
+    env_info,
     filename,
     type_algorithms,
     num_episodes=100,
@@ -18,16 +18,19 @@ def evaluate_agent(
     success_count = 0
     convergence_episode = None
 
+    env = env_info.get('env')
+
     for episode in range(num_episodes):
-        obs = env.reset()
+        obs, info = env.reset()
         done = False
         episode_reward = 0
         step_count = 0
         timeout = False
 
         while not done:
-            action, _states = model.predict(obs, **params_predict)
-            obs, reward, done, info = env.step(action)
+            action = model.predict(obs, **params_predict)
+            obs, reward, terminated, truncated, info = env.step(action)
+            done = terminated or truncated
             reward = float(reward)
             episode_reward += reward
             step_count += 1

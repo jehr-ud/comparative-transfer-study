@@ -1,5 +1,3 @@
-import time
-
 import gymnasium as gym
 import numpy as np
 import pygame
@@ -8,59 +6,70 @@ import pygame
 class VisualMazeEnv(gym.Env):
     metadata = {"render_modes": ["human"], "render_fps": 5}
 
-    def __init__(self, size=5, render_mode=None, obstacles=None, shared_window=None):
+    def __init__(self, config):
         super().__init__()
-        self.size = size
-        self.render_mode = render_mode
+        self.name = config.get("name", "default_maze")
+        self.size = config.get("size", 5)
+        self.render_mode = config.get("render_mode", None)
+        self.obstacles = config.get("obstacles", None)
+        self.shared_window = config.get("shared_window", None)
+
         self.observation_space = gym.spaces.Box(
             low=0,
             high=self.size - 1,
-            shape=(2,), dtype=np.int32
+            shape=(2,), dtype=np.float32
         )
         self.action_space = gym.spaces.Discrete(4)
 
         self.steps_taken = 0
         self.max_steps = 2000
 
-        self.agent_pos = [size - 1, size - 1]
+        self.agent_pos = [self.size - 1, self.size - 1]
         self.goal_pos = [0, 0]
 
-        self.maze = np.zeros((size, size), dtype=int)
+        self.maze = np.zeros((self.size, self.size), dtype=int)
 
-        if obstacles:
-            for (i, j) in obstacles:
+        if self.obstacles:
+            for (i, j) in self.obstacles:
                 if [i, j] != self.agent_pos and [i, j] != self.goal_pos:
                     self.maze[i, j] = 1
 
         self.cell_size = 50
         self.window_size = self.size * self.cell_size
-        self.window = shared_window
+        self.window = self.shared_window
         self.clock = None
 
         if self.render_mode == "human":
             print("[DEBUG] Initializing Pygame window")
             self.clock = pygame.time.Clock()
 
+    def get_obstacle_count(self):
+        return len(self.obstacles)
+
     def reset(self, seed=None, options=None):
         super().reset(seed=seed)
         self.agent_pos = [self.size - 1, self.size - 1]
         self.steps_taken = 0
-        return np.array(self.agent_pos, dtype=np.int32), {}
+        return np.array(self.agent_pos, dtype=np.float32), {}
 
     def step(self, action):
         old_pos = tuple(self.agent_pos)
         new_pos = list(old_pos)
 
-        if action == 0: new_pos[0] -= 1
-        elif action == 1: new_pos[0] += 1
-        elif action == 2: new_pos[1] -= 1
-        elif action == 3: new_pos[1] += 1
+        if action == 0:
+            new_pos[0] -= 1
+        elif action == 1:
+            new_pos[0] += 1
+        elif action == 2:
+            new_pos[1] -= 1
+        elif action == 3:
+            new_pos[1] += 1
 
-        print(f"[DEBUG] Agent at {old_pos}, action {action}, new_pos {new_pos}")
+        print(
+            f"[DEBUG] Agent at {old_pos}, action {action}, new_pos {new_pos}"
+        )
 
         self.steps_taken += 1
-        print("step takein=======")
-        print(self.steps_taken)
 
         reward = -0.01  # Penalización base por paso
         moved = False
@@ -88,11 +97,20 @@ class VisualMazeEnv(gym.Env):
             reward = 1.0
             print("[DEBUG] Goal reached!")
         elif self.steps_taken >= self.max_steps:
-            done = True
             timeout = True
 
-        info = {"timeout": timeout}
-        return np.array(self.agent_pos, dtype=np.int32), reward, done, False, info
+        info = {
+            "steps_taken": self.steps_taken,
+            "timeout": timeout
+        }
+
+        return (
+            np.array(self.agent_pos, dtype=np.float32),
+            reward,
+            done,
+            timeout,
+            info
+        )
 
     def render(self):
         if self.render_mode == "human":
@@ -113,7 +131,8 @@ class VisualMazeEnv(gym.Env):
                 y = row * self.cell_size
                 rect = pygame.Rect(x, y, self.cell_size, self.cell_size)
 
-                color = (50, 50, 50) if self.maze[row, col] == 1 else (240, 240, 240)
+                color = (50, 50, 50) \
+                    if self.maze[row, col] == 1 else (240, 240, 240)
                 pygame.draw.rect(surface, color, rect)
                 pygame.draw.rect(surface, (0, 0, 0), rect, 2)
 
@@ -121,7 +140,11 @@ class VisualMazeEnv(gym.Env):
             self.agent_pos[1] * self.cell_size + self.cell_size // 2,
             self.agent_pos[0] * self.cell_size + self.cell_size // 2
         )
-        pygame.draw.circle(surface, (0, 102, 204), agent_center, self.cell_size // 3)
+        pygame.draw.circle(
+            surface,
+            (0, 102, 204),
+            agent_center, self.cell_size // 3
+        )
 
         goal_rect = pygame.Rect(
             self.goal_pos[1] * self.cell_size + self.cell_size // 4,

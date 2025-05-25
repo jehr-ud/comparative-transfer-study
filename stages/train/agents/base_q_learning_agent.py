@@ -14,7 +14,7 @@ TRAINING_CONFIG = {
 }
 
 
-def train_q_learning_agent(model: QLearning, model_name, env, difficulty):
+def train_q_learning_agent(model: QLearning, model_name, env, difficulty, params_train={}):
     model = model(env)
     episode_rewards = []
 
@@ -24,26 +24,18 @@ def train_q_learning_agent(model: QLearning, model_name, env, difficulty):
     num_episodes = config["num_episodes"]
 
     for episode in range(num_episodes):
-        obs = env.reset()
-        state = obs[0]  # Extrae la observación del primer (y único) entorno
-
+        obs, _ = env.reset()
         total_reward = 0
         done = False
 
         while not done:
-            action_list, _ = model.predict(state, deterministic=False)
+            action_list, _ = model.predict(obs, deterministic=False)
 
-            obs, reward, done_array, info = env.step(action_list)
-            print("information step")
-            print(obs, reward, done_array, info)
+            obs, reward, terminated, truncated, _ = env.step(action_list)
+            done = terminated or truncated
 
-            next_state = obs[0]
-            reward = reward[0]
-            done = done_array[0]
-
-            model.learn(state, action_list, reward, next_state, done)
-
-            state = next_state
+            next_state = obs
+            model.learn(obs, action_list, reward, next_state, done)
             total_reward += reward
 
         model.decay_epsilon()
@@ -55,7 +47,7 @@ def train_q_learning_agent(model: QLearning, model_name, env, difficulty):
                 f"Epsilon: {model.epsilon:.4f}"
             )
 
-            initial_obs = env.reset()
+            initial_obs, _ = env.reset()
             initial_state_for_debug = model.discretize(initial_obs[0])
             if initial_state_for_debug is not None:
                 print(f"Q-values for initial state {initial_state_for_debug}: {model.q_table[initial_state_for_debug]}")

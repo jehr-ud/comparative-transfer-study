@@ -13,8 +13,8 @@ def run_training_and_evaluation(
 ):
 
     for env_info in envs:
-        env = env_info.get('env')
         env_name = env_info.get('name')
+        
         print(f"\n📦 Evaluating environment: {env_name}")
         curves_dict = {}
 
@@ -24,11 +24,14 @@ def run_training_and_evaluation(
             print(f"🚀 Training with {algo_name}")
             # necessary params: class, name of algorithm, env and difficulty
             function_train = algorithm.get('train_function')
+
+            # call function
             agent, rewards = function_train(
                 algorithm.get('class'),
                 model_name=algorithm.get('name'),
-                env=env,
-                difficulty=env_name
+                env_info=env_info,
+                difficulty=env_name,
+                params_train=algorithm.get('params_train', {})
             )
             curves_dict[algo_name] = rewards
             print("✅ Training finished")
@@ -39,7 +42,7 @@ def run_training_and_evaluation(
             path = f"results/{type_algorithms}/{file_results}"
             evaluate_agent(
                 agent,
-                env,
+                env_info,
                 path,
                 type_algorithms,
                 params_predict=algorithm.get('params_predict')

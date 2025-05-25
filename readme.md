@@ -1,6 +1,6 @@
 # 🧠 Visual Maze Reinforcement Learning Project
 
-This project implements training, evaluation, and transfer learning using popular RL algorithms (DQN, PPO, A2C) in a custom visual maze environment.
+This project implements training, evaluation, and Imitation transfer learning using popular RL algorithms (Q-Learning, DQN, PPO, SAC) in a custom visual maze environment.
 
 
 ---

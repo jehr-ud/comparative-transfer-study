@@ -1,99 +1,129 @@
 from pathlib import Path
 
-from stable_baselines3 import DQN, PPO, A2C
 
-from agents.q_learning import QLearning
-#from agents.imitation_agent import ImitationTransfer
-#from agents.cross_domain import CrossDomainTransfer
-from environments import create_env
+from agents.rl_classical import (
+    RLLibAgent as PPO,
+    RLLibAgent as SAC,
+    RLLibAgent as DQN
+)
+from agents.imitation_agent import ImitationMarWilTransfer
 
-from stages.train.agents.base_sb_agent import train_sb_agent
-from stages.train.agents.base_q_learning_agent import train_q_learning_agent
-#from stages.train.agents.imitation_transfer import (
-#    train_imitation_transfer_agent
-#)
-#from stages.train.agents.cross_domain_transfer import (
-#    train_cross_domain_transfer_agent
-#)
+from stages.train.agents.base_classical_agent import train_rllib_agent
+from stages.train.agents.imitation_transfer import (
+    train_imitation_transfer_agent
+)
+from environments.visual_maze_env import VisualMazeEnv
+from ray.tune.registry import register_env
 
-simple_env = create_env("simple")
-medium_env = create_env("medium")
-complex_env = create_env("complex")
 
+def env_creator(cfg):
+    return VisualMazeEnv(cfg)
+
+
+register_env("simple", env_creator)
+register_env("medium", env_creator)
+register_env("complex", env_creator)
+
+
+simple_env_conf = {
+    "name": "simple",
+    "size": 6,
+    "obstacles": [(1, 1), (2, 3), (3, 1)],
+    "render_mode": None,
+    "shared_window": None
+}
+
+medium_env_conf = {
+    "name": "medium",
+    "size": 8,
+    "obstacles": [(1, 2), (2, 4), (5, 5), (6, 3)],
+    "render_mode": None,
+    "shared_window": None
+}
+
+complex_env_conf = {
+    "name": "complex",
+    "size": 12,
+    "obstacles": [(2, 2), (3, 7), (6, 6), (8, 9), (10, 4)],
+    "render_mode": None,
+    "shared_window": None
+}
+
+simple_env = env_creator(simple_env_conf)
+medium_env = env_creator(medium_env_conf)
+complex_env = env_creator(complex_env_conf)
 
 envs = [
     {
         "name": "simple",
+        "config": simple_env_conf,
         "env": simple_env
     },
     {
         "name": "medium",
+        "config": medium_env_conf,
         "env": medium_env
     },
     {
         "name": "complex",
+        "config": complex_env_conf,
         "env": complex_env
     }
 ]
 
+ppo = {
+    "name": "PPO",
+    "class": PPO,
+    "train_function": train_rllib_agent,
+    "params_predict": {},
+    "type": "classical",
+}
+
 classical_algorithms = [
-    {
-        "name": "Q-Learning",
-        "class": QLearning,
-        "train_function": train_q_learning_agent,
-        "params_predict": {"deterministic": True},
-        "type": "classical"
-    },
     {
         "name": "DQN",
         "class": DQN,
-        "train_function": train_sb_agent,
-        "params_predict": {"deterministic": True},
+        "train_function": train_rllib_agent,
+        "params_predict": {},
         "type": "classical",
     },
+    ppo,
     {
-        "name": "PPO",
-        "class": PPO,
-        "train_function": train_sb_agent,
-        "params_predict": {"deterministic": True},
-        "type": "classical",
-    },
-    {
-        "name": "A2C",
-        "class": A2C,
-        "train_function": train_sb_agent,
-        "params_predict": {"deterministic": True},
+        "name": "SAC",
+        "class": SAC,
+        "train_function": train_rllib_agent,
+        "params_predict": {},
         "type": "classical",
     },
 ]
 
 transfer_algorithms = [
     {
-        "name": "Imitation",
-        "class": ImitationTransfer,
+        "name": "Imitation-MarWil",
+        "class": ImitationMarWilTransfer,
         "train_function": train_imitation_transfer_agent,
         "params_predict": {},
         "params_train": {
             "expert": {
-                "model": "PPO",
+                "model": ppo,
                 "path": str(Path("models") / "{model}_{env}")
             },
         },
         "type": "transfer",
     },
     {
-        "name": "CrossDomain",
-        "class": CrossDomainTransfer,
-        "train_function": train_cross_domain_transfer_agent,
+        "name": "Imitation-MarWil",
+        "class": ImitationMarWilTransfer,
+        "train_function": train_imitation_transfer_agent,
         "params_predict": {},
         "params_train": {
             "expert": {
-                "model": "PPO",
+                "model": ppo,
                 "path": str(Path("models") / "{model}_{env}")
             },
         },
         "type": "transfer",
-    },
+    }
 ]
 
 classical_transfer_envs = [

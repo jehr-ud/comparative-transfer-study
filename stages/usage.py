@@ -1,13 +1,11 @@
 from pathlib import Path
-from datetime import datetime
 
 import time
 import pygame
 from PIL import Image
 import numpy as np
 
-from .utils import load_model
-from environments import create_env
+from .utils import load_model, get_env_by_name
 
 
 def run_agent_episode_and_record_gif(
@@ -17,7 +15,7 @@ def run_agent_episode_and_record_gif(
     gif_path="maze_run.gif",
     sleep_time=0.1
 ):
-    obs = env.reset()
+    obs, info = env.reset()
     done = False
     frames = []
     steps = 0
@@ -34,7 +32,8 @@ def run_agent_episode_and_record_gif(
 
         print("Action predicted:", action)
 
-        obs, reward, done, info = env.step(action)
+        obs, reward, terminated, truncated, info = env.step(action)
+        done = terminated or truncated
         print("info:", info)
         total_reward += reward
         steps += 1
@@ -64,7 +63,7 @@ def run_agent_episode_and_record_gif(
     )
 
 
-def show_agent(algoritmhs, difficulty):
+def show_agent(algoritmhs, difficulty, envs):
     pygame.init()
 
     screen_width = 700
@@ -75,15 +74,10 @@ def show_agent(algoritmhs, difficulty):
 
     for algoritmh in algoritmhs:
         model_name = algoritmh.get('name')
+        env = get_env_by_name(difficulty, envs)
 
-        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-
-        env = create_env(
-            difficulty,
-            "human",
-            f"results/monitor/usage_{model_name}_{timestamp}",
-            shared_window=screen
-        )
+        env['render_mode'] = 'human'
+        env['shared_window'] = screen
 
         if env:
             print(f"Env found: {env}")

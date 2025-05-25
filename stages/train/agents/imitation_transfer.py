@@ -1,100 +1,103 @@
 import os
-import tempfile
 
+import pickle
 import numpy as np
-from ray.rllib.algorithms.marwil import MARWILConfig
-from ray.rllib.offline import JsonWriter
 
-from utils.load_model import load_model
+from stages.utils import load_model
+from agents.imitation_agent import ImitationMarWilTransfer
+
 
 TRAINING_CONFIG = {
-    "simple": {
-        "num_episodes": 1000,
-    },
-    "medium": {
-        "num_episodes": 2000,
-    },
-    "complex": {
-        "num_episodes": 3000
-    }
+    "simple": {"num_episodes": 1000},
+    "medium": {"num_episodes": 2000},
+    "complex": {"num_episodes": 3000}
 }
 
 
 def train_imitation_transfer_agent(
-    model,
+    model_class: ImitationMarWilTransfer,
     model_name,
     env,
     difficulty,
-    train_parameters={}
+    params_train={},
+    generate_demonstrations=True
 ):
-    print(f"Training MARWIL imitation model for environment: {difficulty}")
+    print(f"\n🔧 Training MARWIL imitation model for difficulty: {difficulty}")
 
-    # 1. Load expert
-    expert_model_name = train_parameters.get("expert", {}).get("model", "PPO")
-    expert_path_template = train_parameters.get("expert", {}).get("path", "")
-    expert_path = expert_path_template.format(model=expert_model_name, env=difficulty)
-    expert = load_model(expert_model_name, expert_path, env)
-    print(f"Loaded expert from {expert_path}")
+    base_path = "models/demonstrations"
+    os.makedirs(base_path, exist_ok=True)
 
-    # 2. Generate demonstrations and save
-    tmp_dir = tempfile.mkdtemp()
-    writer = JsonWriter(tmp_dir)
+    print(params_train)
+    expert_info = params_train.get("expert", {}).get("model")
 
-    print("Generating expert demonstrations...")
+    expert_name = expert_info.get('name')
+    expert_class = expert_info.get('class')
 
-    config = TRAINING_CONFIG.get(difficulty, TRAINING_CONFIG["simple"])
-    num_episodes = config["num_episodes"]
+    expert_path_template = params_train.get("expert", {}).get("path", "")
+    expert_path = expert_path_template.format(model=expert_name, env=difficulty)
+    traj_file_path = f"{base_path}/{difficulty}_{expert_name}_trajectories.pkl"
 
-    for _ in range(num_episodes):
-        obs = env.reset()
-        done = False
-        while not done:
-            action, _ = expert.predict(obs)
-            next_obs, reward, done, info = env.step(action)
-            writer.write({
-                "obs": obs,
-                "actions": action,
-                "rewards": reward,
-                "dones": done,
-                "new_obs": next_obs,
-            })
-            obs = next_obs
+    print("search in")
+    print(expert_path)
 
-    # 3. Configure MARWIL training
-    config = (
-        MARWILConfig()
-        .environment(lambda config: env)
-        .offline_data(input_="dataset")
-        .framework("torch")
-        .rollouts(num_rollout_workers=0)
-        .training(train_batch_size=200)
-    )
-    config["input"] = tmp_dir
+    if generate_demonstrations:
+        print("📦 Generating expert demonstrations...")
+        expert = load_model(expert_path, expert_class, env)
+        print(f"✅ Loaded expert from {expert_path}")
 
-    # 4. Train with MARWIL
-    algo = config.build()
-    for _ in range(10):
-        result = algo.train()
-        print(f"Iteration reward: {result['episode_reward_mean']}")
+        trajectories = []
+        num_episodes = TRAINING_CONFIG.get(difficulty, TRAINING_CONFIG["simple"])["num_episodes"]
 
-    # 5. Save MARWIL model
-    model_path = os.path.join("models", f"{model_name}_{difficulty}")
-    os.makedirs(model_path, exist_ok=True)
-    algo.save(model_path)
+        for _ in range(num_episodes):
+            obs, _ = env.reset()
+            done = False
+            traj = {"states": [], "actions": [], "rewards": [], "dones": []}
 
-    # 6. Wrap the policy
-    imitation_agent = model(policy=algo.get_policy(), path=model_path)
+            while not done:
+                obs = np.array(obs)
+                action, _ = expert.predict(obs)
+                next_obs, reward, terminated, truncated, info = env.step(action)
+                done = terminated or truncated
 
-    # 7. Evaluate the imitation agent
+                traj["states"].append(obs.copy())
+                traj["actions"].append(action.copy())
+                traj["rewards"].append(reward)
+                traj["dones"].append(done)
+
+                obs = next_obs
+
+            for key in traj:
+                traj[key] = np.array(traj[key])
+            trajectories.append(traj)
+
+        with open(traj_file_path, "wb") as f:
+            pickle.dump(trajectories, f)
+        print(
+            f"💾 Saved {len(trajectories)} expert trajectories to {traj_file_path}"
+        )
+
+    imitation_model = model_class(env)
+    imitation_model = imitation_model.load(traj_file_path)
+
+    print("🚀 Starting imitation training...")
+    for i in range(10):
+        result = imitation_model.learn()
+        print(f"[Iter {i}] Mean reward: {result['episode_reward_mean']}")
+
+    imitation_model.save(f"{difficulty}_{model_name}")
+
+    # Evaluate trained model
     rewards = []
     for _ in range(5):
-        obs = env.reset()
+        obs, _ = env.reset()
         done = False
         total_reward = 0
         while not done:
-            action = imitation_agent.predict(obs)
-            obs, reward, done, _ = env.step(action)
+            action, _ = imitation_model.predict(obs)
+            obs, reward, terminated, truncated, info = env.step(action)
+            done = terminated or truncated
             total_reward += reward
         rewards.append(total_reward)
 
-    return imitation_agent, rewards
+    print("🎯 Evaluation completed. Rewards:", rewards)
+    return imitation_model, rewards
