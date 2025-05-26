@@ -1,5 +1,4 @@
 import gc
-import time
 import atexit
 
 from environments.visual_maze_env import VisualMazeEnv
@@ -23,9 +22,9 @@ def run_training_and_evaluation(
     algorithms: list,
     type_algorithms: str
 ):
-
     if not ray.is_initialized():
         ray.init()
+        atexit.register(ray.shutdown)
 
     for env_info in envs:
         env_name = env_info.get('name')
@@ -70,15 +69,19 @@ def run_training_and_evaluation(
             )
             print("📊 Evaluation finished")
 
-            ray.shutdown()
-
             if hasattr(agent, "env") and agent.env is not None:
                 try:
                     agent.env.close()
                 except Exception as e:
                     print(f"Could not close environment: {e}")
 
-            time.sleep(1)
+            if hasattr(agent, "stop"):
+                try:
+                    agent.stop()
+                except Exception as e:
+                    print(f"[ERROR] Could not stop model: {e}")
+
+            ray.shutdown()
 
         plot_learning_curves(
             env_name,

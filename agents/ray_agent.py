@@ -2,7 +2,7 @@ from pathlib import Path
 
 from ray.rllib.algorithms.ppo import PPOConfig
 from ray.rllib.algorithms.dqn import DQNConfig
-from ray.rllib.algorithms.sac import SACConfig
+from ray.rllib.algorithms.impala import IMPALAConfig
 import torch
 import torch.distributions as D
 
@@ -11,23 +11,24 @@ params = {
     "simple": {
         "PPO": {
             "gamma": 0.90,
-            "lr": 3e-4,
+            "lr": 1e-4,
             "train_batch_size": 512,
             "num_sgd_iter": 10,
+            "vf_loss_coeff": 0.5,
+            "entropy_coeff": 0.01,
+            "clip_param": 0.2,
         },
         "DQN": {
             "gamma": 0.95,
             "lr": 1e-4,
             "train_batch_size": 512,
+            "target_network_update_freq": 500
         },
-        "SAC": {
-            "gamma": 0.98,
-            "lr": None,
-            "actor_lr": 3e-4,
-            "critic_lr": 3e-4,
-            "alpha_lr": 3e-4,
-            "train_batch_size": 256,
-            "target_entropy": "auto"
+        "IMPALA": {
+            "lr": 1e-4,
+            "gamma": 0.90,
+            "vf_loss_coeff": 0.5,
+            "entropy_coeff": 0.01
         }
     },
     "medium": {
@@ -36,40 +37,44 @@ params = {
             "lr": 2e-4,
             "train_batch_size": 1024,
             "num_sgd_iter": 15,
+            "vf_loss_coeff": 0.5,
+            "entropy_coeff": 0.01,
+            "clip_param": 0.2,
         },
         "DQN": {
             "gamma": 0.98,
-            "lr": 5e-5,
+            "lr": 2e-5,
             "train_batch_size": 1024,
+            "target_network_update_freq": 1000
         },
-        "SAC": {
-            "gamma": 0.99,
-            "actor_lr": 3e-4,
-            "critic_lr": 3e-4,
-            "alpha_lr": 3e-4,
-            "train_batch_size": 512,
-            "target_entropy": "auto"
+        "IMPALA": {
+            "lr": 2e-4,
+            "gamma": 0.95,
+            "vf_loss_coeff": 0.5,
+            "entropy_coeff": 0.01
         }
     },
     "complex": {
         "PPO": {
             "gamma": 0.99,
-            "lr": 1e-4,
+            "lr": 3e-4,
             "train_batch_size": 2048,
             "num_sgd_iter": 20,
+            "vf_loss_coeff": 0.5,
+            "entropy_coeff": 0.01,
+            "clip_param": 0.2,
         },
         "DQN": {
             "gamma": 0.99,
-            "lr": 1e-5,
+            "lr": 3e-5,
             "train_batch_size": 2048,
+            "target_network_update_freq": 1500,
         },
-        "SAC": {
-            "gamma": 0.995,
-            "actor_lr": 3e-4,
-            "critic_lr": 3e-4,
-            "alpha_lr": 3e-4,
-            "train_batch_size": 1024,
-            "target_entropy": "auto"
+        "IMPALA": {
+            "lr": 3e-4,
+            "gamma": 0.99,
+            "vf_loss_coeff": 0.5,
+            "entropy_coeff": 0.01
         }
     }
 }
@@ -108,8 +113,8 @@ class RLLibAgent:
             config = PPOConfig()
         elif self.name == "DQN":
             config = DQNConfig()
-        elif self.name == "SAC":
-            config = SACConfig()
+        elif self.name == "IMPALA":
+            config = IMPALAConfig()
         else:
             raise ValueError("Agentt not configured.")
 

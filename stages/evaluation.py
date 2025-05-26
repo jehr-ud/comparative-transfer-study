@@ -1,5 +1,4 @@
 import csv
-import time
 
 import matplotlib.pyplot as plt
 import numpy as np
@@ -175,7 +174,7 @@ def evaluate_transfer_learning(
                 'Target Env': target_env.get('name'),
                 'Model': model_name,
                 'Env Name': difficulty,
-                'Env Size': target_env.get('size')
+                'Env Size': target_env.get('config').get('size')
             }
             result.update(metrics)
             all_results.append(result)
@@ -192,7 +191,7 @@ def evaluate_transfer_learning(
                 except Exception as e:
                     print(f"[ERROR] Could not stop model: {e}")
 
-    filename = f"{model_name}_{difficulty}_transfer_evaluation_metrics.csv"
+    filename = f"{difficulty}_transfer_evaluation_metrics.csv"
     filename = f"results/{type_algorithms}/{filename}"
 
     save_transfer_results(all_results, filename)

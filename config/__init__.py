@@ -3,7 +3,7 @@ from pathlib import Path
 
 from agents.ray_agent import (
     RLLibAgent as PPO,
-    RLLibAgent as SAC,
+    RLLibAgent as IMPALA,
     RLLibAgent as DQN
 )
 from agents.imitation_agent import ImitationMarWilTransfer
@@ -80,21 +80,21 @@ ppo = {
 }
 
 classical_algorithms = [
-    #{
-    #    "name": "DQN",
-    #    "class": DQN,
-    #    "train_function": train_rllib_agent,
-    #    "params_predict": {},
-    #    "type": "classical",
-    #},
-    ppo
-    #{
-    #    "name": "SAC",
-    #    "class": SAC,
-    #    "train_function": train_rllib_agent,
-    #    "params_predict": {},
-    #    "type": "classical",
-    #},
+    {
+        "name": "DQN",
+        "class": DQN,
+        "train_function": train_rllib_agent,
+        "params_predict": {},
+        "type": "classical",
+    },
+    ppo,
+    {
+        "name": "IMPALA",
+        "class": IMPALA,
+        "train_function": train_rllib_agent,
+        "params_predict": {},
+        "type": "classical",
+    },
 ]
 
 transfer_algorithms = [
