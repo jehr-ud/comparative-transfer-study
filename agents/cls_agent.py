@@ -216,6 +216,9 @@ class Learner:
         print(f"Training for context {context_name} complete.")
         self.expert_in_training = None
 
+    def stop(self):
+        self.agent.stop()
+
     def predict(self, raw_obs):
         if self.current_context is None:
             raise ValueError("Context not detected. Call detect_context at episode start.")

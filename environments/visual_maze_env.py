@@ -22,8 +22,11 @@ class VisualMazeEnv(gym.Env):
         self.action_space = gym.spaces.Discrete(4)
 
         self.steps_taken = 0
-        self.max_steps = 2000
+        num_obstacles = len(self.obstacles) if isinstance(self.obstacles, list) else 1
+        steps_constant = 3
+        self.max_steps = steps_constant * (self.size ** 2 + 2 * num_obstacles)
 
+        self.num_obstacles = num_obstacles
         self.agent_pos = [self.size - 1, self.size - 1]
         self.goal_pos = [0, 0]
 
@@ -44,7 +47,7 @@ class VisualMazeEnv(gym.Env):
             self.clock = pygame.time.Clock()
 
     def get_obstacle_count(self):
-        return len(self.obstacles)
+        return self.num_obstacles
 
     def reset(self, seed=None, options=None):
         super().reset(seed=seed)

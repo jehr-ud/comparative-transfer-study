@@ -1,5 +1,18 @@
 from pathlib import Path
-from agents.rl_classical import RLLibAgent
+from agents.ray_agent import RLLibAgent
+
+
+TRAINING_CONFIG = {
+    "simple": {
+        "num_iterations": 100,
+    },
+    "medium": {
+        "num_iterations": 1000,
+    },
+    "complex": {
+        "num_iterations": 2500,
+    }
+}
 
 
 def train_rllib_agent(
@@ -10,32 +23,26 @@ def train_rllib_agent(
     save_path="./models",
     params_train={}
 ):
-    agent: RLLibAgent = agent_class(model_name, difficulty, env_info, save_path)
+    agent: RLLibAgent = agent_class(
+        model_name,
+        difficulty,
+        env_info,
+        save_path
+    )
 
-    for i in range(1000):
+    train_params = TRAINING_CONFIG[difficulty]
+
+    rewards = []
+
+    for i in range(train_params.get('num_iterations')):
+        print(f"Iteration {i} for {model_name}")
         result = agent.train()
-        print(f"Iter {i}: reward = {result['episode_reward_mean']:.2f}")
-
-    agent.train()
-
-    env = env_info.get('env')
-
-    obs, info = env.reset()
-    done = False
-    total_reward = 0
-
-    while not done:
-        action = agent.predict(obs)
-        obs, reward, terminated, truncated, info = env.step(action)
-        print(info)
-        done = terminated or truncated
-        total_reward += reward
-
-    print(f"[{model_name}-{difficulty}] Evaluation reward: {total_reward}")
+        rewards.append(result.get("module_episode_returns_mean", {}).get("default_policy", 0))
+        print(f"Iteración {i}, Recompensa promedio: {rewards[-1]}")
 
     model_path = f"models/{model_name}_{difficulty}"
     save_to = Path(model_path) if model_path else model_path / f"{model_name}_{difficulty}"
     save_to = save_to.resolve()
     agent.save(str(save_to))
 
-    return agent, total_reward
+    return agent, rewards

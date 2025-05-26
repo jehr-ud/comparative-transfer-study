@@ -1,7 +1,7 @@
 from pathlib import Path
 
 
-from agents.rl_classical import (
+from agents.ray_agent import (
     RLLibAgent as PPO,
     RLLibAgent as SAC,
     RLLibAgent as DQN
@@ -13,16 +13,10 @@ from stages.train.agents.imitation_transfer import (
     train_imitation_transfer_agent
 )
 from environments.visual_maze_env import VisualMazeEnv
-from ray.tune.registry import register_env
 
 
 def env_creator(cfg):
     return VisualMazeEnv(cfg)
-
-
-register_env("simple", env_creator)
-register_env("medium", env_creator)
-register_env("complex", env_creator)
 
 
 simple_env_conf = {
@@ -53,22 +47,28 @@ simple_env = env_creator(simple_env_conf)
 medium_env = env_creator(medium_env_conf)
 complex_env = env_creator(complex_env_conf)
 
+simple_env_info = {
+    "name": "simple",
+    "config": simple_env_conf,
+    "env": simple_env
+}
+
+medium_env_info = {
+    "name": "medium",
+    "config": medium_env_conf,
+    "env": medium_env
+}
+
+complex_env_info = {
+    "name": "complex",
+    "config": complex_env_conf,
+    "env": complex_env
+}
+
 envs = [
-    {
-        "name": "simple",
-        "config": simple_env_conf,
-        "env": simple_env
-    },
-    {
-        "name": "medium",
-        "config": medium_env_conf,
-        "env": medium_env
-    },
-    {
-        "name": "complex",
-        "config": complex_env_conf,
-        "env": complex_env
-    }
+    simple_env_info,
+    medium_env_info,
+    complex_env_info
 ]
 
 ppo = {
@@ -80,21 +80,21 @@ ppo = {
 }
 
 classical_algorithms = [
-    {
-        "name": "DQN",
-        "class": DQN,
-        "train_function": train_rllib_agent,
-        "params_predict": {},
-        "type": "classical",
-    },
-    ppo,
-    {
-        "name": "SAC",
-        "class": SAC,
-        "train_function": train_rllib_agent,
-        "params_predict": {},
-        "type": "classical",
-    },
+    #{
+    #    "name": "DQN",
+    #    "class": DQN,
+    #    "train_function": train_rllib_agent,
+    #    "params_predict": {},
+    #    "type": "classical",
+    #},
+    ppo
+    #{
+    #    "name": "SAC",
+    #    "class": SAC,
+    #    "train_function": train_rllib_agent,
+    #    "params_predict": {},
+    #    "type": "classical",
+    #},
 ]
 
 transfer_algorithms = [
@@ -126,70 +126,55 @@ transfer_algorithms = [
     }
 ]
 
-classical_transfer_envs = [
+classical_transfer_experiments = [
     {
-        "target": {
-            "env": medium_env,
-            "name": "Medium",
-        },
+        "target_env": medium_env_info,
         "source_model_paths": [
             {
-                "name": "Simple",
+                "difficulty": "simple",
                 "path": str(Path("models") / "{model}_simple"),
-            },
+            }
         ],
     },
     {
-        "target": {
-            "env": complex_env,
-            "name": "Complex",
-        },
+        "target_env": complex_env_info,
         "source_model_paths": [
             {
-                "name": "Simple",
+                "difficulty": "simple",
                 "path": str(Path("models") / "{model}_simple"),
             },
             {
-                "name": "Medium",
+                "difficulty": "medium",
                 "path": str(Path("models") / "{model}_medium"),
             },
         ],
     },
 ]
 
-transfer_envs = [
+transfer_experiments = [
     {
-        "target": {
-            "env": simple_env,
-            "name": "Simple",
-        },
+        "target_env": simple_env_info,
         "source_model_paths": [
             {
-                "name": "simple",
+                "difficulty": "simple",
                 "path": str(Path("models") / "{model}_simple"),
             },
         ],
     },
     {
-        "target": {
-            "env": medium_env,
-            "name": "Medium",
-        },
+        "target_env": medium_env_info,
         "source_model_paths": [
             {
-                "name": "medium",
+                "difficulty": "medium",
                 "path": str(Path("models") / "{model}_medium"),
             },
         ],
     },
     {
-        "target": {
-            "env": complex_env,
-            "name": "Complex",
-        },
+        "target_env": complex_env_info,
         "source_model_paths": [
             {
-                "name": "Complex",
+                "difficulty": "complex",
                 "path": str(Path("models") / "{model}_complex"),
             },
         ],

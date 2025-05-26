@@ -7,7 +7,13 @@ from stages.utils import load_model
 from agents.imitation_agent import ImitationMarWilTransfer
 
 
-TRAINING_CONFIG = {
+TRAINING_EXPERT_CONFIG = {
+    "simple": {"num_episodes": 1000},
+    "medium": {"num_episodes": 2000},
+    "complex": {"num_episodes": 3000}
+}
+
+TRAINING_LEARNER_CONFIG = {
     "simple": {"num_episodes": 1000},
     "medium": {"num_episodes": 2000},
     "complex": {"num_episodes": 3000}
@@ -46,7 +52,7 @@ def train_imitation_transfer_agent(
         print(f"✅ Loaded expert from {expert_path}")
 
         trajectories = []
-        num_episodes = TRAINING_CONFIG.get(difficulty, TRAINING_CONFIG["simple"])["num_episodes"]
+        num_episodes = TRAINING_EXPERT_CONFIG.get(difficulty, TRAINING_EXPERT_CONFIG["simple"])["num_episodes"]
 
         for _ in range(num_episodes):
             obs, _ = env.reset()
@@ -80,24 +86,15 @@ def train_imitation_transfer_agent(
     imitation_model = imitation_model.load(traj_file_path)
 
     print("🚀 Starting imitation training...")
-    for i in range(10):
+    iterations = TRAINING_LEARNER_CONFIG[difficulty]
+
+    rewards = []
+    for i in range(iterations):
         result = imitation_model.learn()
-        print(f"[Iter {i}] Mean reward: {result['episode_reward_mean']}")
+        episode_reward_mean = result.get("module_episode_returns_mean", {}).get("default_policy", 0)
+        print(f"[Iter {i}] Mean reward: {episode_reward_mean}")
+        rewards.append(episode_reward_mean)
 
     imitation_model.save(f"{difficulty}_{model_name}")
 
-    # Evaluate trained model
-    rewards = []
-    for _ in range(5):
-        obs, _ = env.reset()
-        done = False
-        total_reward = 0
-        while not done:
-            action, _ = imitation_model.predict(obs)
-            obs, reward, terminated, truncated, info = env.step(action)
-            done = terminated or truncated
-            total_reward += reward
-        rewards.append(total_reward)
-
-    print("🎯 Evaluation completed. Rewards:", rewards)
     return imitation_model, rewards

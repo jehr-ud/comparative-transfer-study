@@ -1,4 +1,5 @@
 import csv
+import time
 
 import matplotlib.pyplot as plt
 import numpy as np
@@ -8,6 +9,7 @@ from .utils import load_model
 
 def evaluate_agent(
     model,
+    model_name,
     env_info,
     filename,
     type_algorithms,
@@ -94,7 +96,7 @@ def evaluate_agent(
         "Success Rate": success_rate,
         "Average Reward": average_reward,
         "Average Steps": average_steps / max(total_steps),  # Normalize
-    }, f"results/{type_algorithms}/evaluation_metrics_plot.png")
+    }, f"results/{type_algorithms}/{model_name}_evaluation_metrics_plot.png")
 
     return {
         "success_rate": success_rate,
@@ -121,7 +123,7 @@ def plot_metrics(metrics_dict, save_path):
 def evaluate_transfer_learning(
     model_name,
     model_class,
-    environments,
+    experiments,
     type_algorithms,
     num_episodes=10
 ):
@@ -131,26 +133,39 @@ def evaluate_transfer_learning(
     """
     all_results = []
 
-    for env_info in environments:
-        target_env = env_info.get('target')
-        name_env = env_info.get('name')
-        for source_model in env_info.get('source_model_paths'):
-            env_label = source_model.get('name')
-            model_path_template = source_model.get('path')
-            model_path = model_path_template.format(
+    for experiment in experiments:
+        target_env = experiment.get('target_env')
+        source_models = experiment.get('source_model_paths')
+
+        for source_model in source_models:
+            difficulty = source_model.get('difficulty')
+            model_path = source_model.get('path')
+
+            print(
+                f"[DEBUG] TL evaluation for {model_name} {difficulty}"
+            )
+
+            model_path = model_path.format(
                 model=model_name
             )
 
+            print(f"Loading {model_path}")
+            print(target_env)
             loaded_model = load_model(
+                model_name,
                 model_path,
                 model_class,
-                target_env.get('env')
+                difficulty,
+                target_env
             )
-            name_file = f"{model_name}_{env_label}_metrics.csv"
+
+            name_file = f"{model_name}_{difficulty}_metrics.csv"
             file = f'results/{type_algorithms}/{name_file}'
+
             metrics = evaluate_agent(
                 loaded_model,
-                target_env.get('env'),
+                model_name,
+                target_env,
                 file,
                 type_algorithms,
                 num_episodes,
@@ -159,14 +174,25 @@ def evaluate_transfer_learning(
             result = {
                 'Target Env': target_env.get('name'),
                 'Model': model_name,
-                'Env Name': env_label,
-                'Env Size': target_env.get('env').envs[0].size
+                'Env Name': difficulty,
+                'Env Size': target_env.get('size')
             }
             result.update(metrics)
-
             all_results.append(result)
 
-    filename = f"{name_env}_transfer_evaluation_metrics.csv"
+            if hasattr(loaded_model, "env") and loaded_model.env is not None:
+                try:
+                    loaded_model.env.close()
+                except Exception as e:
+                    print(f"Could not close environment: {e}")
+
+            if hasattr(loaded_model, "stop"):
+                try:
+                    loaded_model.stop()
+                except Exception as e:
+                    print(f"[ERROR] Could not stop model: {e}")
+
+    filename = f"{model_name}_{difficulty}_transfer_evaluation_metrics.csv"
     filename = f"results/{type_algorithms}/{filename}"
 
     save_transfer_results(all_results, filename)

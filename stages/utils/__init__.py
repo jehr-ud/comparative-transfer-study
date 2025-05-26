@@ -1,4 +1,7 @@
-def load_model(model_path, model_class, env=None):
+from pathlib import Path
+
+
+def load_model(model_name, model_path, model_class, difficulty, env_info):
     """
     Loads a trained model from disk.
 
@@ -12,17 +15,20 @@ def load_model(model_path, model_class, env=None):
     """
     # QLearning models require the environment to be passed during instantiation
     if model_class.__name__ == "QLearning":
-        if env is None:
+        if env_info is None:
             raise ValueError("QLearning requires an environment to be loaded.")
-        model = model_class(env)
+        model = model_class(env_info)
         model.load(model_path)
         return model
 
-    try:
-        return model_class.load(model_path, env=env)
-    except TypeError:
-        # If the model class does not accept the 'env' argument during load
-        return model_class.load(model_path)
+    # Ray Model
+    base_path = f"{model_name}_{difficulty}"
+    load_to = Path(model_path) if model_path else model_path / base_path
+    load_to = load_to.resolve()
+
+    model = model_class(model_name, difficulty, env_info)
+    model.load(str(load_to))
+    return model
 
 
 def get_env_by_name(name, envs):

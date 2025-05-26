@@ -3,13 +3,13 @@ from agents.q_learning import QLearning
 
 TRAINING_CONFIG = {
     "simple": {
-        "num_episodes": 50000,
+        "num_episodes": 100_000,
     },
     "medium": {
-        "num_episodes": 1000000,
+        "num_episodes": 500_000,
     },
     "complex": {
-        "num_episodes": 2500000,
+        "num_episodes": 1_000_000,
     }
 }
 

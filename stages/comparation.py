@@ -1,3 +1,11 @@
+import gc
+import time
+import atexit
+
+from environments.visual_maze_env import VisualMazeEnv
+import ray
+from ray.tune.registry import register_env
+
 from stages.evaluation import (
     evaluate_agent,
     evaluate_transfer_learning,
@@ -6,19 +14,31 @@ from stages.evaluation import (
 )
 
 
+def env_creator(cfg):
+    return VisualMazeEnv(cfg)
+
+
 def run_training_and_evaluation(
     envs,
     algorithms: list,
     type_algorithms: str
 ):
 
+    if not ray.is_initialized():
+        ray.init()
+
     for env_info in envs:
         env_name = env_info.get('name')
-        
+
         print(f"\n📦 Evaluating environment: {env_name}")
         curves_dict = {}
 
         for algorithm in algorithms:
+            if not ray.is_initialized():
+                ray.init()
+
+            register_env("visual_env", env_creator)
+
             algo_name = f"{algorithm.get('name')}"
 
             print(f"🚀 Training with {algo_name}")
@@ -42,12 +62,23 @@ def run_training_and_evaluation(
             path = f"results/{type_algorithms}/{file_results}"
             evaluate_agent(
                 agent,
+                algorithm.get('name'),
                 env_info,
                 path,
                 type_algorithms,
                 params_predict=algorithm.get('params_predict')
             )
             print("📊 Evaluation finished")
+
+            ray.shutdown()
+
+            if hasattr(agent, "env") and agent.env is not None:
+                try:
+                    agent.env.close()
+                except Exception as e:
+                    print(f"Could not close environment: {e}")
+
+            time.sleep(1)
 
         plot_learning_curves(
             env_name,
@@ -64,15 +95,23 @@ def run_training_and_evaluation(
 
 def run_transfer_comparation(
     algorithms: list,
-    transfer_envs=None
+    experiments
 ):
     # transfer evaluation
-    if transfer_envs:
-        print("\n🔄 Transfer learning evaluation")
-        for algorithm in algorithms:
-            evaluate_transfer_learning(
-                algorithm.get('name'),
-                algorithm.get('class'),
-                transfer_envs,
-                "transfer"
-            )
+    print("\n🔄 Transfer learning evaluation")
+    if not ray.is_initialized():
+        ray.init()
+        atexit.register(ray.shutdown)
+
+    register_env("visual_env", env_creator)
+
+    for algorithm in algorithms:
+        evaluate_transfer_learning(
+            algorithm.get('name'),
+            algorithm.get('class'),
+            experiments,
+            "transfer"
+        )
+
+    ray.shutdown()
+    gc.collect()

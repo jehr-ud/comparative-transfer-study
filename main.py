@@ -6,8 +6,8 @@ from stages.usage import show_agent
 from config import (
     envs,
     classical_algorithms,
-    classical_transfer_envs,
-    transfer_envs,
+    classical_transfer_experiments,
+    transfer_experiments,
     transfer_algorithms
 )
 
@@ -15,13 +15,16 @@ from config import (
 def run_classical_methods():
     print("🎯 Running classical methods...")
     run_training_and_evaluation(envs, classical_algorithms, "classical")
-    run_transfer_comparation(classical_algorithms, classical_transfer_envs)
+    run_transfer_comparation(
+        classical_algorithms,
+        classical_transfer_experiments
+    )
 
 
 def run_transfer_methods():
     print("🎁 Running transfer methods...")
     run_training_and_evaluation(envs, transfer_algorithms, "transfer")
-    run_transfer_comparation(classical_algorithms, transfer_envs)
+    run_transfer_comparation(classical_algorithms, transfer_experiments)
 
 
 if __name__ == "__main__":
