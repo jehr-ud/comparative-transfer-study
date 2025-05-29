@@ -12,6 +12,7 @@ def evaluate_agent(
     env_info,
     filename,
     type_algorithms,
+    experiment_number: int,
     num_episodes=100,
     params_predict={}
 ):
@@ -50,6 +51,7 @@ def evaluate_agent(
                 convergence_episode = episode + 1
 
         episode_data.append({
+            "Experiment": experiment_number,
             "Episode": episode + 1,
             "Reward": episode_reward,
             "Success": int(success),
@@ -68,7 +70,7 @@ def evaluate_agent(
     )
 
     # Save episode-level data
-    fieldnames = ["Episode", "Reward", "Success", "Timeout", "Steps"]
+    fieldnames = ["Experiment", "Episode", "Reward", "Success", "Timeout", "Steps"]
     with open(filename, mode='w', newline='') as f:
         writer = csv.DictWriter(f, fieldnames=fieldnames)
         writer.writeheader()
@@ -83,19 +85,14 @@ def evaluate_agent(
         writer.writerow(['Average Reward', average_reward])
         writer.writerow(['Average Steps per Episode', average_steps])
         writer.writerow(['Convergence Speed (Episode)', convergence_speed])
+        writer.writerow(['Experiment', experiment_number])
 
     # Print summary
     print(f"✅ Success Rate: {success_rate:.2f}")
     print(f"📊 Average Reward: {average_reward:.2f}")
     print(f"📈 Average Steps: {average_steps:.2f}")
     print(f"🚀 Convergence Speed: {convergence_speed}")
-
-    # Plot bar chart of metrics
-    plot_metrics({
-        "Success Rate": success_rate,
-        "Average Reward": average_reward,
-        "Average Steps": average_steps / max(total_steps),  # Normalize
-    }, f"results/{type_algorithms}/{model_name}_evaluation_metrics_plot.png")
+    print(f"✅ Experiment: {experiment_number}")
 
     return {
         "success_rate": success_rate,
@@ -124,7 +121,8 @@ def evaluate_transfer_learning(
     model_class,
     experiments,
     type_algorithms,
-    num_episodes=10
+    experiment_number,
+    num_episodes=100
 ):
     """
     Evaluate a model across different environments
@@ -144,6 +142,8 @@ def evaluate_transfer_learning(
                 f"[DEBUG] TL evaluation for {model_name} {difficulty}"
             )
 
+            model_path = f"{experiment_number}_{model_path}"
+
             model_path = model_path.format(
                 model=model_name
             )
@@ -158,7 +158,7 @@ def evaluate_transfer_learning(
                 target_env
             )
 
-            name_file = f"{model_name}_{difficulty}_metrics.csv"
+            name_file = f"{experiment_number}_{model_name}_{difficulty}_metrics.csv"
             file = f'results/{type_algorithms}/{name_file}'
 
             metrics = evaluate_agent(
@@ -191,12 +191,12 @@ def evaluate_transfer_learning(
                 except Exception as e:
                     print(f"[ERROR] Could not stop model: {e}")
 
-    filename = f"{difficulty}_transfer_evaluation_metrics.csv"
+    filename = f"{experiment_number}_{difficulty}_transfer_evaluation_metrics.csv"
     filename = f"results/{type_algorithms}/{filename}"
 
     save_transfer_results(all_results, filename)
     print_transfer_summary(all_results)
-    plot_transfer_metrics(all_results, type_algorithms)
+    plot_transfer_metrics(all_results, type_algorithms, experiment_number)
 
 
 def save_transfer_results(results, filename):
@@ -219,7 +219,7 @@ def print_transfer_summary(results):
               f"Avg Reward: {r.get('Average Reward', 0):.2f}")
 
 
-def plot_transfer_metrics(results, type_algorithms):
+def plot_transfer_metrics(results, type_algorithms, experiment_number):
     """ Plot comparison charts for each metric
         across models and environment sizes.
     """
@@ -245,15 +245,15 @@ def plot_transfer_metrics(results, type_algorithms):
         plt.legend()
         plt.tight_layout()
         safe_metric = metric.replace(" ", "_").lower()
-        plt.savefig(f'results/{type_algorithms}/{safe_metric}_comparison.png')
+        plt.savefig(f'results/{type_algorithms}/{experiment_number}_{safe_metric}_comparison.png')
 
 
 def plot_learning_curves(env_name, curves_dict, output_file):
     plt.figure(figsize=(12, 6))
     for label, rewards in curves_dict.items():
         plt.plot(rewards, label=label)
-    plt.xlabel("Episodes")
-    plt.ylabel("Reward per episode")
+    plt.xlabel("Iterations")
+    plt.ylabel("Reward per Iteration")
     plt.title(f"Learning curves by algorithm for envoiroment {env_name}")
     plt.legend()
     plt.grid(True)

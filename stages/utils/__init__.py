@@ -1,7 +1,13 @@
 from pathlib import Path
 
 
-def load_model(model_name, model_path, model_class, difficulty, env_info):
+def load_model(
+    model_name,
+    model_path,
+    model_class,
+    difficulty,
+    env_info
+):
     """
     Loads a trained model from disk.
 

@@ -45,9 +45,7 @@ class QLearning:
         """
         self.env = env
         self.action_size = env.action_space.n
-
-        real_env = env.envs[0].env
-        env_size = getattr(real_env, "size", None)
+        env_size = self.env.size
         print(env_size)
 
         params = CONFIG_PER_ENV.get(f"env_size_{env_size}")

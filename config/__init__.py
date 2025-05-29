@@ -6,11 +6,15 @@ from agents.ray_agent import (
     RLLibAgent as IMPALA,
     RLLibAgent as DQN
 )
+from agents.q_learning import QLearning
 from agents.imitation_agent import ImitationMarWilTransfer
 
 from stages.train.agents.base_classical_agent import train_rllib_agent
 from stages.train.agents.imitation_transfer import (
     train_imitation_transfer_agent
+)
+from stages.train.agents.base_q_learning_agent import (
+    train_q_learning_agent
 )
 from environments.visual_maze_env import VisualMazeEnv
 
@@ -79,22 +83,35 @@ ppo = {
     "type": "classical",
 }
 
+qlearning = {
+    "name": "QLearning",
+    "class": QLearning,
+    "train_function": train_q_learning_agent,
+    "params_predict": {"deterministic": True},
+    "type": "classical",
+}
+
+dqn = {
+    "name": "DQN",
+    "class": DQN,
+    "train_function": train_rllib_agent,
+    "params_predict": {},
+    "type": "classical",
+}
+
+impala = {
+    "name": "IMPALA",
+    "class": IMPALA,
+    "train_function": train_rllib_agent,
+    "params_predict": {},
+    "type": "classical",
+}
+
 classical_algorithms = [
-    {
-        "name": "DQN",
-        "class": DQN,
-        "train_function": train_rllib_agent,
-        "params_predict": {},
-        "type": "classical",
-    },
     ppo,
-    {
-        "name": "IMPALA",
-        "class": IMPALA,
-        "train_function": train_rllib_agent,
-        "params_predict": {},
-        "type": "classical",
-    },
+    dqn,
+    qlearning,
+    impala
 ]
 
 transfer_algorithms = [
@@ -105,7 +122,7 @@ transfer_algorithms = [
         "params_predict": {},
         "params_train": {
             "expert": {
-                "model": ppo,
+                "expert_info": ppo,
                 "path": str(Path("models") / "{model}_{env}")
             },
         },
@@ -118,7 +135,7 @@ transfer_algorithms = [
         "params_predict": {},
         "params_train": {
             "expert": {
-                "model": ppo,
+                "expert_info": ppo,
                 "path": str(Path("models") / "{model}_{env}")
             },
         },

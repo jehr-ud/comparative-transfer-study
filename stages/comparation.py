@@ -20,12 +20,9 @@ def env_creator(cfg):
 def run_training_and_evaluation(
     envs,
     algorithms: list,
-    type_algorithms: str
+    type_algorithms: str,
+    experiment_number: int
 ):
-    if not ray.is_initialized():
-        ray.init()
-        atexit.register(ray.shutdown)
-
     for env_info in envs:
         env_name = env_info.get('name')
 
@@ -34,7 +31,7 @@ def run_training_and_evaluation(
 
         for algorithm in algorithms:
             if not ray.is_initialized():
-                ray.init()
+                ray.init(include_dashboard=False)
 
             register_env("visual_env", env_creator)
 
@@ -50,14 +47,15 @@ def run_training_and_evaluation(
                 model_name=algorithm.get('name'),
                 env_info=env_info,
                 difficulty=env_name,
-                params_train=algorithm.get('params_train', {})
+                params_train=algorithm.get('params_train', {}),
+                experiment_number=experiment_number
             )
             curves_dict[algo_name] = rewards
             print("✅ Training finished")
 
             print("📊 Evaluation starting..")
 
-            file_results = f"{algo_name}_{env_name}_metrics.csv"
+            file_results = f"{experiment_number}_{algo_name}_{env_name}_metrics.csv"
             path = f"results/{type_algorithms}/{file_results}"
             evaluate_agent(
                 agent,
@@ -65,6 +63,7 @@ def run_training_and_evaluation(
                 env_info,
                 path,
                 type_algorithms,
+                experiment_number,
                 params_predict=algorithm.get('params_predict')
             )
             print("📊 Evaluation finished")
@@ -81,16 +80,14 @@ def run_training_and_evaluation(
                 except Exception as e:
                     print(f"[ERROR] Could not stop model: {e}")
 
-            ray.shutdown()
-
         plot_learning_curves(
             env_name,
             curves_dict,
-            f"results/{type_algorithms}/learning_curves_{env_name}.png"
+            f"results/{type_algorithms}/{experiment_number}_learning_curves_{env_name}.png"
         )
         save_learning_curves(
             curves_dict,
-            f"results/{type_algorithms}/learning_curves_{env_name}.csv"
+            f"results/{type_algorithms}/{experiment_number}_learning_curves_{env_name}.csv"
         )
 
     return curves_dict
@@ -98,12 +95,13 @@ def run_training_and_evaluation(
 
 def run_transfer_comparation(
     algorithms: list,
-    experiments
+    experiments,
+    experiment_number: int
 ):
     # transfer evaluation
     print("\n🔄 Transfer learning evaluation")
     if not ray.is_initialized():
-        ray.init()
+        ray.init(include_dashboard=False)
         atexit.register(ray.shutdown)
 
     register_env("visual_env", env_creator)
@@ -113,7 +111,8 @@ def run_transfer_comparation(
             algorithm.get('name'),
             algorithm.get('class'),
             experiments,
-            "transfer"
+            "transfer",
+            experiment_number
         )
 
     ray.shutdown()

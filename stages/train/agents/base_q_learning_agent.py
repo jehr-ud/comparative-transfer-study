@@ -3,27 +3,35 @@ from agents.q_learning import QLearning
 
 TRAINING_CONFIG = {
     "simple": {
-        "num_episodes": 100_000,
+        "num_iterations": 100,
     },
     "medium": {
-        "num_episodes": 500_000,
+        "num_iterations": 200,
     },
     "complex": {
-        "num_episodes": 1_000_000,
+        "num_iterations": 400,
     }
 }
 
 
-def train_q_learning_agent(model: QLearning, model_name, env, difficulty, params_train={}):
+def train_q_learning_agent(
+    model: QLearning,
+    model_name,
+    difficulty,
+    env_info,
+    experiment_number,
+    params_train={}
+):
+    env = env_info.get('env')
     model = model(env)
     episode_rewards = []
 
     print(f"Train: {model_name} in {difficulty}")
 
     config = TRAINING_CONFIG.get(difficulty, TRAINING_CONFIG["simple"])
-    num_episodes = config["num_episodes"]
+    num_iterations = config["num_iterations"]
 
-    for episode in range(num_episodes):
+    for episode in range(num_iterations):
         obs, _ = env.reset()
         total_reward = 0
         done = False
@@ -54,7 +62,7 @@ def train_q_learning_agent(model: QLearning, model_name, env, difficulty, params
             else:
                 print("Could not discretize initial state for debug.")
 
-    model_path = f"models/{model_name}_{difficulty}.pkl"
+    model_path = f"models/{experiment_number}_{model_name}_{difficulty}.pkl"
     model.save(model_path)
 
     return model, episode_rewards

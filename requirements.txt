@@ -5,9 +5,11 @@ shimmy
 gputil
 pygame
 matplotlib
+python-dotenv
 pandas
 seaborn
 spikingjelly
+pyarrow
 ray[rllib]==2.46.0
 torch
 transformers

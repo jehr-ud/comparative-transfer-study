@@ -11,93 +11,101 @@ params = {
     "simple": {
         "PPO": {
             "gamma": 0.90,
-            "lr": 1e-4,
-            "train_batch_size": 512,
-            "num_sgd_iter": 10,
+            "lr": 3e-4,
+            "train_batch_size": 256,
+            "num_sgd_iter": 5,
             "vf_loss_coeff": 0.5,
             "entropy_coeff": 0.01,
             "clip_param": 0.2,
+            "train_batch_size_per_learner": 256,
         },
         "DQN": {
             "gamma": 0.95,
-            "lr": 1e-4,
-            "train_batch_size": 512,
-            "target_network_update_freq": 500
+            "lr": 3e-4,
+            "target_network_update_freq": 250,
+            "train_batch_size_per_learner": 256
         },
         "IMPALA": {
-            "lr": 1e-4,
+            "lr": 3e-4,
             "gamma": 0.90,
             "vf_loss_coeff": 0.5,
-            "entropy_coeff": 0.01
+            "entropy_coeff": 0.01,
+            "train_batch_size_per_learner": 256,
         }
     },
     "medium": {
         "PPO": {
             "gamma": 0.95,
-            "lr": 2e-4,
-            "train_batch_size": 1024,
-            "num_sgd_iter": 15,
+            "lr": 4e-4,
+            "train_batch_size": 512,
+            "num_sgd_iter": 8,
             "vf_loss_coeff": 0.5,
             "entropy_coeff": 0.01,
             "clip_param": 0.2,
+            "train_batch_size_per_learner": 512,
         },
         "DQN": {
             "gamma": 0.98,
-            "lr": 2e-5,
-            "train_batch_size": 1024,
-            "target_network_update_freq": 1000
+            "lr": 4e-4,
+            "target_network_update_freq": 400,
+            "train_batch_size_per_learner": 512
         },
         "IMPALA": {
-            "lr": 2e-4,
+            "lr": 4e-4,
             "gamma": 0.95,
             "vf_loss_coeff": 0.5,
-            "entropy_coeff": 0.01
+            "entropy_coeff": 0.01,
+            "train_batch_size_per_learner": 512,
         }
     },
     "complex": {
         "PPO": {
             "gamma": 0.99,
-            "lr": 3e-4,
-            "train_batch_size": 2048,
-            "num_sgd_iter": 20,
+            "lr": 5e-4,
+            "train_batch_size": 1024,
+            "num_sgd_iter": 10,
             "vf_loss_coeff": 0.5,
             "entropy_coeff": 0.01,
             "clip_param": 0.2,
+            "train_batch_size_per_learner": 1024,
         },
         "DQN": {
             "gamma": 0.99,
-            "lr": 3e-5,
-            "train_batch_size": 2048,
-            "target_network_update_freq": 1500,
+            "lr": 5e-4,
+            "target_network_update_freq": 500,
+            "train_batch_size_per_learner": 1024
         },
         "IMPALA": {
-            "lr": 3e-4,
+            "lr": 5e-4,
             "gamma": 0.99,
             "vf_loss_coeff": 0.5,
-            "entropy_coeff": 0.01
+            "entropy_coeff": 0.01,
+            "train_batch_size_per_learner": 1024,
         }
     }
 }
 
 ENV_RUNNER_CONFIG = {
-    "simple": {
-        "num_env_runners": 1,
-    },
-    "medium": {
-        "num_env_runners": 1,
-    },
-    "complex": {
-        "num_env_runners": 1,
-    }
+    "simple":  {"num_env_runners": 1, "num_envs_per_env_runner": 2},  # 2 envs
+    "medium":  {"num_env_runners": 2, "num_envs_per_env_runner": 2},  # 4 envs
+    "complex": {"num_env_runners": 3, "num_envs_per_env_runner": 2}   # 6 envs
 }
 
 
 class RLLibAgent:
-    def __init__(self, name, difficulty, env_info, save_path="./models"):
+    def __init__(
+        self, name,
+        difficulty,
+        env_info,
+        save_path="./models",
+        explore=False
+    ):
         self.name = name
         self.difficulty = difficulty
         self.env_info = env_info
         self.save_path = Path(save_path)
+
+        self.explore = explore
 
         self.config = self._get_config()
         self.agent = self.config.build()
@@ -124,10 +132,15 @@ class RLLibAgent:
             env_config=self.env_info.get('config')
         )
 
-        num_env_runners = ENV_RUNNER_CONFIG.get(self.difficulty, {}).get("num_env_runners", 1)
-        config.env_runners(num_env_runners=num_env_runners)
+        config.learners(num_learners=2)
+
+        info_runners = ENV_RUNNER_CONFIG.get(self.difficulty, {})
+        info_runners["explore"] = self.explore
+
+        config.env_runners(**info_runners)
 
         config = config.training(**algo_params)
+
         return config
 
     def predict(self, obs):

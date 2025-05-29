@@ -23,7 +23,7 @@ class VisualMazeEnv(gym.Env):
 
         self.steps_taken = 0
         num_obstacles = len(self.obstacles) if isinstance(self.obstacles, list) else 1
-        steps_constant = 3
+        steps_constant = 2
         self.max_steps = steps_constant * (self.size ** 2 + 2 * num_obstacles)
 
         self.num_obstacles = num_obstacles
