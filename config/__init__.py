@@ -8,8 +8,10 @@ from agents.ray_agent import (
 )
 from agents.q_learning import QLearning
 from agents.imitation_agent import ImitationMarWilTransfer
+from agents.cpa_agent import CPAgent
 
 from stages.train.agents.base_classical_agent import train_rllib_agent
+from stages.train.agents.expert_learner_agent import train_agent
 from stages.train.agents.imitation_transfer import (
     train_imitation_transfer_agent
 )
@@ -72,7 +74,7 @@ complex_env_info = {
 envs = [
     simple_env_info,
     medium_env_info,
-    complex_env_info
+    # complex_env_info
 ]
 
 ppo = {
@@ -114,33 +116,34 @@ classical_algorithms = [
     impala
 ]
 
-transfer_algorithms = [
-    {
-        "name": "Imitation-MarWil",
-        "class": ImitationMarWilTransfer,
-        "train_function": train_imitation_transfer_agent,
-        "params_predict": {},
-        "params_train": {
-            "expert": {
-                "expert_info": ppo,
-                "path": str(Path("models") / "{model}_{env}")
-            },
+
+marwil = {
+    "name": "Imitation-MarWil",
+    "class": ImitationMarWilTransfer,
+    "train_function": train_imitation_transfer_agent,
+    "params_predict": {},
+    "params_train": {
+        "expert": {
+            "expert_info": ppo,
+            "path": str(Path("models") / "{model}_{env}")
         },
-        "type": "transfer",
     },
-    {
-        "name": "Imitation-MarWil",
-        "class": ImitationMarWilTransfer,
-        "train_function": train_imitation_transfer_agent,
-        "params_predict": {},
-        "params_train": {
-            "expert": {
-                "expert_info": ppo,
-                "path": str(Path("models") / "{model}_{env}")
-            },
-        },
-        "type": "transfer",
-    }
+    "type": "transfer",
+}
+
+# Perception-Action Agent
+cpa = {
+    "name": "CPA-Agent",
+    "class": CPAgent,
+    "train_function": train_agent,
+    "params_predict": {},
+    "params_train": {
+    },
+    "type": "transfer",
+}
+
+transfer_algorithms = [
+    cpa
 ]
 
 classical_transfer_experiments = [
@@ -178,22 +181,22 @@ transfer_experiments = [
             },
         ],
     },
-    {
-        "target_env": medium_env_info,
-        "source_model_paths": [
-            {
-                "difficulty": "medium",
-                "path": str(Path("models") / "{model}_medium"),
-            },
-        ],
-    },
-    {
-        "target_env": complex_env_info,
-        "source_model_paths": [
-            {
-                "difficulty": "complex",
-                "path": str(Path("models") / "{model}_complex"),
-            },
-        ],
-    },
+    #{
+    #    "target_env": medium_env_info,
+    #    "source_model_paths": [
+    #        {
+    #            "difficulty": "medium",
+    #            "path": str(Path("models") / "{model}_medium"),
+    #        },
+    #    ],
+    #},
+    #{
+    #    "target_env": complex_env_info,
+    #    "source_model_paths": [
+    #        {
+    #            "difficulty": "complex",
+    #            "path": str(Path("models") / "{model}_complex"),
+    #        },
+    #    ],
+    #},
 ]

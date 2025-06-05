@@ -57,16 +57,19 @@ def run_training_and_evaluation(
 
             file_results = f"{experiment_number}_{algo_name}_{env_name}_metrics.csv"
             path = f"results/{type_algorithms}/{file_results}"
-            evaluate_agent(
-                agent,
-                algorithm.get('name'),
-                env_info,
-                path,
-                type_algorithms,
-                experiment_number,
-                params_predict=algorithm.get('params_predict')
-            )
-            print("📊 Evaluation finished")
+
+            if agent:
+                print("📊 Evaluation start")
+                evaluate_agent(
+                    agent,
+                    algorithm.get('name'),
+                    env_info,
+                    path,
+                    type_algorithms,
+                    experiment_number,
+                    params_predict=algorithm.get('params_predict')
+                )
+                print("📊 Evaluation finished")
 
             if hasattr(agent, "env") and agent.env is not None:
                 try:

@@ -1,24 +1,22 @@
+from pathlib import Path
 import os
-
 import pandas as pd
-import pyarrow as pa
-import pyarrow.parquet as pq
+import traceback
 import numpy as np
 
 from stages.utils import load_model
 from agents.imitation_agent import ImitationMarWilTransfer
-
+from agents.ray_agent import RLLibAgent
+from stages.utils import (
+    load_progress,
+    get_max_iterations,
+    save_progress
+)
 
 TRAINING_EXPERT_CONFIG = {
     "simple": {"num_iterations": 50},
     "medium": {"num_iterations": 100},
     "complex": {"num_iterations": 200}
-}
-
-TRAINING_LEARNER_CONFIG = {
-    "simple": {"num_iterations": 100},
-    "medium": {"num_iterations": 200},
-    "complex": {"num_iterations": 400}
 }
 
 
@@ -32,7 +30,7 @@ def train_imitation_transfer_agent(
     generate_demonstrations=True,
     save_path="./models"
 ):
-    print(f"\n🔧 Training MARWIL imitation model for difficulty: {difficulty}")
+    print(f"\n🔧 Training {model_name} imitation model for difficulty: {difficulty}")
 
     base_path = "models/demonstrations"
     os.makedirs(base_path, exist_ok=True)
@@ -55,9 +53,9 @@ def train_imitation_transfer_agent(
     print("search in")
     print(expert_path)
 
-    if not generate_demonstrations:
+    if generate_demonstrations:
         print("📦 Generating expert demonstrations...")
-        expert = load_model(
+        expert: RLLibAgent = load_model(
             expert_name,
             expert_path,
             expert_class,
@@ -113,23 +111,47 @@ def train_imitation_transfer_agent(
         df.to_parquet(traj_file_path, index=False, engine="pyarrow")
         print(f"💾 Saved expert trajectories to {traj_file_path}")
 
+        if expert:
+            try:
+                expert.stop()
+            except Exception as e:
+                print(f"[ERROR] Failed to stop agent cleanly: {e}")
+
     print("🚀 Starting imitation training...")
-    num_iterations = TRAINING_LEARNER_CONFIG.get(
-        difficulty, TRAINING_LEARNER_CONFIG["simple"]
-    )["num_iterations"]
 
     rewards = []
-    i = 0
 
-    while i < num_iterations:
+    save_path = Path(save_path).resolve()
+    final_model_path = save_path / f"{experiment_number}_{model_name}_{difficulty}"
+    temp_model_path = save_path / "temporal" / f"{experiment_number}_{model_name}_{difficulty}"
+
+    temp_model_path.mkdir(parents=True, exist_ok=True)
+    final_model_path.mkdir(parents=True, exist_ok=True)
+
+    imitation_model = None
+
+    start_iteration = load_progress(model_name, difficulty, experiment_number)
+    max_iterations = get_max_iterations(difficulty)
+    i = start_iteration
+
+    while i < max_iterations:
+        imitation_model = None
         try:
-            imitation_model = model_class(
+            imitation_model: ImitationMarWilTransfer = model_class(
                 model_name,
                 difficulty,
                 env_info,
-                save_path
+                save_path,
+                explore=True
             )
-            imitation_model.load(traj_file_path)
+
+            if any(temp_model_path.iterdir()):
+                print(f"Iteration {i}: Loading model from {temp_model_path}")
+                imitation_model.load(str(temp_model_path))
+            else:
+                print(f"Iteration {i}: No previous model found, starting from scratch...")
+
+            imitation_model.load_trajectories(traj_file_path)
 
             result = imitation_model.learn()
             reward_mean = result.get("module_episode_returns_mean", {}).get("default_policy", None)
@@ -137,15 +159,26 @@ def train_imitation_transfer_agent(
                 reward_mean = result.get("env_runners", {}).get("episode_return_mean", 0)
             rewards.append(reward_mean)
             print(f"[Iter {i}] Mean reward: {reward_mean}")
-            i += 1  # exitoso
+            i += 1
 
-            imitation_model.stop()
+            imitation_model.save(str(temp_model_path))
+            save_progress(i, model_name, difficulty, experiment_number)
+
         except Exception as e:
             print(f"[⚠️ Iter {i}] Error during training: {e}")
-            if imitation_model:
-                imitation_model.stop()
+            traceback.print_exc()
             break
+        finally:
+            if imitation_model:
+                try:
+                    imitation_model.stop()
+                except Exception as stop_e:
+                    print(f"[⚠️] Error stopping model: {stop_e}")
 
-    imitation_model.save(f"{experiment_number}_{model_name}_{difficulty}")
+    if imitation_model:
+        try:
+            imitation_model.save(str(final_model_path))
+        except Exception as save_e:
+            print(f"[❌] Error saving final model: {save_e}")
 
     return imitation_model, rewards

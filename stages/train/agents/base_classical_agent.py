@@ -1,43 +1,13 @@
 from pathlib import Path
 import time
-import os
-import json
 import shutil
 
 from agents.ray_agent import RLLibAgent
-
-TRAINING_CONFIG = {
-    "simple": {"num_iterations": 100},
-    "medium": {"num_iterations": 200},
-    "complex": {"num_iterations": 400}
-}
-
-
-def get_progress_file(model_name, experiment_number, difficulty):
-    return f"progress_train_{experiment_number}_{model_name}_{difficulty}.json"
-
-
-def save_progress(iteration, model_name, difficulty, experiment_number):
-    progress = {
-        "iteration": iteration,
-        "difficulty": difficulty,
-        "experiment_number": experiment_number
-    }
-    with open(get_progress_file(model_name, experiment_number, difficulty), "w") as f:
-        json.dump(progress, f, indent=2)
-
-
-def load_progress(model_name, difficulty, experiment_number):
-    file = get_progress_file(model_name, experiment_number, difficulty)
-    if os.path.exists(file):
-        with open(file, "r") as f:
-            data = json.load(f)
-            return data.get("iteration", 0)
-    return 0
-
-
-def get_max_iterations(difficulty):
-    return TRAINING_CONFIG[difficulty]["num_iterations"]
+from stages.utils import (
+    load_progress,
+    get_max_iterations,
+    save_progress
+)
 
 
 def train_rllib_agent(
@@ -62,10 +32,12 @@ def train_rllib_agent(
     rewards = []
     i = start_iteration
 
+    agent = None
+
     while i < max_iterations:
         agent = None
         try:
-            agent = agent_class(
+            agent: RLLibAgent = agent_class(
                 model_name,
                 difficulty,
                 env_info,

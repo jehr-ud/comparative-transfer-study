@@ -1,31 +1,58 @@
+from pathlib import Path
+from agents.cpa_agent import CPAgent
+from environments.visual_maze_env import VisualMazeEnv
+from stages.utils import (
+    load_progress,
+    get_max_iterations,
+    save_progress
+)
+
+
 def train_agent(
-    agent_class,
+    model_class: CPAgent,
     model_name,
+    env_info,
     difficulty,
-    env,
-    save_path="./models",
-    params_train={}
+    experiment_number,
+    params_train=None,
+    save_path="./models"
 ):
-    agent = agent_class(model_name, difficulty, env, save_path=save_path)
+    if params_train is None:
+        params_train = {}
 
-    initial_obs, _ = env.reset()
-    detected_context = agent.learner.detect_context(initial_obs)
-    agent.learner.current_context = detected_context
-    agent.train(detected_context, num_iterations=params_train.get("num_iterations", 100))
+    agent: CPAgent = model_class(
+        model_name,
+        difficulty,
+        env_info,
+        save_path=save_path
+    )
 
-    obs, _ = env.reset()
-    done = False
-    total_reward = 0
+    rewards = []
+    save_path = Path(save_path).resolve()
+    path = f"{experiment_number}_{model_name}_{difficulty}"
+    final_model_path = save_path / path
+    temp_model_path = save_path / "temporal" / path
 
-    episode_rewards = []
+    temp_model_path.mkdir(parents=True, exist_ok=True)
+    final_model_path.mkdir(parents=True, exist_ok=True)
 
-    while not done:
-        action = agent.predict(obs)
-        action_list
-        print(info)
-        total_reward += reward
+    start_iteration = load_progress(model_name, difficulty, experiment_number)
+    max_iterations = get_max_iterations(difficulty)
 
-    print(f"[{model_name}-{difficulty}] Evaluation reward: {total_reward}")
-    episode_rewards.append(total_reward)
+    episode = start_iteration
 
-    return agent, episode_rewards
+    while episode < max_iterations:
+        reward_mean = agent.train()
+        rewards.append(reward_mean)
+
+        agent.save(str(temp_model_path))
+        save_progress(episode + 1, model_name, difficulty, experiment_number)
+        episode += 1
+
+    if agent:
+        try:
+            agent.save(str(final_model_path))
+        except Exception as save_e:
+            print(f"[❌] Error saving final model: {save_e}")
+
+    return agent, rewards

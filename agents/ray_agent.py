@@ -10,8 +10,8 @@ import torch.distributions as D
 params = {
     "simple": {
         "PPO": {
-            "gamma": 0.90,
-            "lr": 3e-4,
+            "gamma": 0.95,
+            "lr": 1e-4,
             "train_batch_size": 256,
             "num_sgd_iter": 5,
             "vf_loss_coeff": 0.5,
@@ -21,13 +21,13 @@ params = {
         },
         "DQN": {
             "gamma": 0.95,
-            "lr": 3e-4,
+            "lr": 1e-4,
             "target_network_update_freq": 250,
             "train_batch_size_per_learner": 256
         },
         "IMPALA": {
-            "lr": 3e-4,
-            "gamma": 0.90,
+            "lr": 1e-4,
+            "gamma": 0.95,
             "vf_loss_coeff": 0.5,
             "entropy_coeff": 0.01,
             "train_batch_size_per_learner": 256,
@@ -35,24 +35,24 @@ params = {
     },
     "medium": {
         "PPO": {
-            "gamma": 0.95,
-            "lr": 4e-4,
+            "gamma": 0.97,
+            "lr": 2e-4,
             "train_batch_size": 512,
             "num_sgd_iter": 8,
             "vf_loss_coeff": 0.5,
-            "entropy_coeff": 0.01,
+            "entropy_coeff": 0.02,
             "clip_param": 0.2,
             "train_batch_size_per_learner": 512,
         },
         "DQN": {
-            "gamma": 0.98,
-            "lr": 4e-4,
+            "gamma": 0.97,
+            "lr": 2e-4,
             "target_network_update_freq": 400,
             "train_batch_size_per_learner": 512
         },
         "IMPALA": {
-            "lr": 4e-4,
-            "gamma": 0.95,
+            "lr": 2e-4,
+            "gamma": 0.97,
             "vf_loss_coeff": 0.5,
             "entropy_coeff": 0.01,
             "train_batch_size_per_learner": 512,
@@ -61,22 +61,22 @@ params = {
     "complex": {
         "PPO": {
             "gamma": 0.99,
-            "lr": 5e-4,
+            "lr": 3e-4,
             "train_batch_size": 1024,
             "num_sgd_iter": 10,
             "vf_loss_coeff": 0.5,
-            "entropy_coeff": 0.01,
+            "entropy_coeff": 0.05,
             "clip_param": 0.2,
             "train_batch_size_per_learner": 1024,
         },
         "DQN": {
             "gamma": 0.99,
-            "lr": 5e-4,
+            "lr": 3e-4,
             "target_network_update_freq": 500,
             "train_batch_size_per_learner": 1024
         },
         "IMPALA": {
-            "lr": 5e-4,
+            "lr": 3e-4,
             "gamma": 0.99,
             "vf_loss_coeff": 0.5,
             "entropy_coeff": 0.01,
@@ -88,13 +88,14 @@ params = {
 ENV_RUNNER_CONFIG = {
     "simple":  {"num_env_runners": 1, "num_envs_per_env_runner": 2},  # 2 envs
     "medium":  {"num_env_runners": 2, "num_envs_per_env_runner": 2},  # 4 envs
-    "complex": {"num_env_runners": 3, "num_envs_per_env_runner": 2}   # 6 envs
+    "complex": {"num_env_runners": 2, "num_envs_per_env_runner": 3}   # 5 envs
 }
 
 
 class RLLibAgent:
     def __init__(
-        self, name,
+        self,
+        name,
         difficulty,
         env_info,
         save_path="./models",
@@ -126,7 +127,6 @@ class RLLibAgent:
         else:
             raise ValueError("Agentt not configured.")
 
-        print(self.env_info.get('config'))
         config.environment(
             env="visual_env",
             env_config=self.env_info.get('config')

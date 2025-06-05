@@ -35,7 +35,7 @@ RESULTS_DIRS = {
 }
 
 PROGRESS_FILE = "progress.json"
-TOTAL_RUNS = 3
+TOTAL_RUNS = 5
 
 
 def clean_directories(type):
@@ -75,25 +75,30 @@ def run_classical_methods(experiment_number):
 def run_transfer_methods(experiment_number):
     print("🎁 Running transfer methods...")
     run_training_and_evaluation(
-        envs, transfer_algorithms,
+        envs,
+        transfer_algorithms,
         "transfer",
         experiment_number
     )
     run_transfer_comparation(
-        classical_algorithms,
+        transfer_algorithms,
         transfer_experiments,
         experiment_number
     )
 
 
 if __name__ == "__main__":
-    choice = input(
-        "What do you want to run? (classical / transfer): "
-    ).strip().lower()
+    #choice = input(
+    #    "What do you want to run? (classical / transfer): "
+    #).strip().lower()
+    
+    choice = "transfer"
 
-    need_run_experiments = input(
-        "Do you want to train? (y/n): "
-    ).strip().lower()
+    need_run_experiments = "y"
+    
+    #input(
+    #    "Do you want to train? (y/n): "
+    #).strip().lower()
 
     if need_run_experiments == "y":
         progress = load_progress()

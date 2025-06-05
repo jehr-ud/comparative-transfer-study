@@ -1,17 +1,9 @@
 from agents.q_learning import QLearning
-
-
-TRAINING_CONFIG = {
-    "simple": {
-        "num_iterations": 100,
-    },
-    "medium": {
-        "num_iterations": 200,
-    },
-    "complex": {
-        "num_iterations": 400,
-    }
-}
+from stages.utils import (
+    load_progress,
+    get_max_iterations,
+    save_progress
+)
 
 
 def train_q_learning_agent(
@@ -22,16 +14,18 @@ def train_q_learning_agent(
     experiment_number,
     params_train={}
 ):
-    env = env_info.get('env')
+    env = env_info.get("env")
     model = model(env)
     episode_rewards = []
 
     print(f"Train: {model_name} in {difficulty}")
 
-    config = TRAINING_CONFIG.get(difficulty, TRAINING_CONFIG["simple"])
-    num_iterations = config["num_iterations"]
+    start_iteration = load_progress(model_name, difficulty, experiment_number)
+    max_iterations = get_max_iterations(difficulty)
 
-    for episode in range(num_iterations):
+    episode = start_iteration
+
+    while episode < max_iterations:
         obs, _ = env.reset()
         total_reward = 0
         done = False
@@ -51,7 +45,7 @@ def train_q_learning_agent(
 
         if (episode + 1) % 500 == 0:
             print(
-                f"Episode {episode + 1}: Total Reward: {total_reward}, "
+                f"Episode {episode}: Total Reward: {total_reward}, "
                 f"Epsilon: {model.epsilon:.4f}"
             )
 
@@ -61,6 +55,9 @@ def train_q_learning_agent(
                 print(f"Q-values for initial state {initial_state_for_debug}: {model.q_table[initial_state_for_debug]}")
             else:
                 print("Could not discretize initial state for debug.")
+
+        save_progress(episode + 1, model_name, difficulty, experiment_number)
+        episode += 1
 
     model_path = f"models/{experiment_number}_{model_name}_{difficulty}.pkl"
     model.save(model_path)

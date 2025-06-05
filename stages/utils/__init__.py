@@ -1,4 +1,6 @@
 from pathlib import Path
+import os
+import json
 
 
 def load_model(
@@ -39,3 +41,37 @@ def load_model(
 
 def get_env_by_name(name, envs):
     return next((env for env in envs if env["name"] == name), None)
+
+
+TRAINING_CONFIG = {
+    "simple": {"num_iterations": 800},  # 800
+    "medium": {"num_iterations": 1500},  # 1500
+    "complex": {"num_iterations": 2000}  # 2000
+}
+
+
+def get_progress_file(model_name, experiment_number, difficulty):
+    return f"progress_train_{experiment_number}_{model_name}_{difficulty}.json"
+
+
+def save_progress(iteration, model_name, difficulty, experiment_number):
+    progress = {
+        "iteration": iteration,
+        "difficulty": difficulty,
+        "experiment_number": experiment_number
+    }
+    with open(get_progress_file(model_name, experiment_number, difficulty), "w") as f:
+        json.dump(progress, f, indent=2)
+
+
+def load_progress(model_name, difficulty, experiment_number):
+    file = get_progress_file(model_name, experiment_number, difficulty)
+    if os.path.exists(file):
+        with open(file, "r") as f:
+            data = json.load(f)
+            return data.get("iteration", 0)
+    return 0
+
+
+def get_max_iterations(difficulty):
+    return TRAINING_CONFIG[difficulty]["num_iterations"]
