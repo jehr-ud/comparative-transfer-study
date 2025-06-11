@@ -5,6 +5,9 @@ import ray
 import torch
 import torch.distributions as D
 from ray.rllib.algorithms.marwil import MARWILConfig
+from ray.tune.registry import register_env
+from environments.visual_maze_env import VisualMazeEnv
+
 
 CONFIG_BY_DIFFICULTY = {
             "simple": {
@@ -34,6 +37,10 @@ ENV_RUNNER_CONFIG = {
 }
 
 
+def env_creator(env_config):
+    return VisualMazeEnv(env_config)
+
+
 class ImitationMarWilTransfer:
     def __init__(
         self,
@@ -52,6 +59,8 @@ class ImitationMarWilTransfer:
         self.policy = None
         self.save_path = save_path
 
+        register_env("visual_env", env_creator)
+
         self.config = self._get_config()
         self.agent = self.config.build()
 
@@ -62,7 +71,8 @@ class ImitationMarWilTransfer:
             )
 
         self.save_path.mkdir(parents=True, exist_ok=True)
-        save_to = Path(path) if path else self.save_path / f"{self.name}_{self.difficulty}"
+        save_to = Path(path) if path \
+            else self.save_path / f"{self.name}_{self.difficulty}"
         self.agent.save(str(save_to))
         print(f"Model saved to {save_to}")
 

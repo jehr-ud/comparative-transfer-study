@@ -1,499 +1,298 @@
 import os
-import random
-
 from pathlib import Path
-import collections
-from ray.rllib.algorithms.ppo import PPOConfig
-from ray.rllib.utils.framework import try_import_torch
-from ray.rllib.policy.sample_batch import SampleBatch
-import gymnasium as gym
-
 import numpy as np
+import torch
+import torch.nn as nn
+
 import pickle
-import pandas as pd
-
-import torch.distributions as D
-from spikingjelly.activation_based import neuron, functional, surrogate
-
-torch, nn = try_import_torch()
+from d3rlpy.datasets import MDPDataset
+from d3rlpy.algos import DQNConfig
+from spikingjelly.activation_based import neuron
 
 
-ENV_RUNNER_CONFIG = {
-    "simple":  {"num_env_runners": 1, "num_envs_per_env_runner": 2},
-    "medium":  {"num_env_runners": 2, "num_envs_per_env_runner": 2},
-    "complex": {"num_env_runners": 2, "num_envs_per_env_runner": 3}
-}
+# ------------------------- #
+# --- MÓDULOS DEL MAPA COGNITIVO SNN --- #
+# ------------------------- #
 
-
-class SNNFeatureExtractor(nn.Module):
-    def __init__(self, input_shape, output_dim):
+class GridCellModule(nn.Module):
+    def __init__(self, map_size=(32, 32), device='cpu'):
         super().__init__()
-        self.input_shape = input_shape
-        self.output_dim = output_dim
-        self.last_processed_features = None
-        self.last_raw_observation_processed = None
+        self.map_size = map_size
+        self.device = device
+        self.grid_neurons = neuron.LIFNode(tau=2.0, v_threshold=1.0, detach_reset=True)
+        self.membrane_potential = torch.zeros(1, *map_size, device=self.device)
 
-        if len(input_shape) == 1:
-            self.features = nn.Sequential(
-                nn.Linear(input_shape[0], 128),
-                neuron.LIFNode(surrogate_function=surrogate.ATan()),
-                nn.Linear(128, 128),
-                neuron.LIFNode(surrogate_function=surrogate.ATan()),
-                nn.Linear(128, output_dim),
-                neuron.LIFNode(surrogate_function=surrogate.ATan(), detach_reset=True)
-            )
-        else:
-            raise ValueError(f"Unsupported input shape: {input_shape}")
+    def reset(self):
+        self.membrane_potential.zero_()
+        center_x, center_y = self.map_size[0] // 2, self.map_size[1] // 2
+        self.membrane_potential[0, center_x-1:center_x+1, center_y-1:center_y+1] = 1.5
 
-    def forward(self, x, time_steps=8):
-        original_device = x.device if isinstance(x, torch.Tensor) else next(self.parameters()).device
-        if not isinstance(x, torch.Tensor):
-            x = torch.tensor(x, dtype=torch.float32)
+    def update_state(self, velocity_vector):
+        dx, dy = int(velocity_vector[0]), int(velocity_vector[1])
+        self.membrane_potential = torch.roll(self.membrane_potential, shifts=(dx, dy), dims=(1, 2))
+        _ = self.grid_neurons(self.membrane_potential)
+        self.membrane_potential = self.grid_neurons.v
 
-        x = x.to(original_device)
+    def get_current_spikes(self):
+        return (self.membrane_potential > self.grid_neurons.v_threshold).float()
 
-        if x.dim() == len(self.input_shape):
-            x = x.unsqueeze(0)
 
-        self.last_raw_observation_processed = x.detach().cpu().numpy()
+class PlaceCellModule(nn.Module):
+    def __init__(self, grid_map_size=(32, 32), num_place_cells=256, device='cpu'):
+        super().__init__()
+        grid_flat_size = grid_map_size[0] * grid_map_size[1]
+        self.fc = nn.Linear(grid_flat_size, num_place_cells).to(device)
+        self.place_neurons = neuron.LIFNode(v_threshold=1.0, detach_reset=True)
 
-        # [T, B, *dims]
-        x_time_series = x.unsqueeze(0).repeat(time_steps, 1, *([1] * (x.dim() -1 )))
+    def forward(self, grid_spikes):
+        x = grid_spikes.flatten(1).float()
+        current_injection = self.fc(x)
+        spikes = self.place_neurons(current_injection)
+        return spikes
 
-        functional.reset_net(self)
 
-        output_spikes_sum = torch.zeros(x.shape[0], self.output_dim).to(x.device)
-        for t in range(time_steps):
-            out_t = self.features(x_time_series[t])
-            output_spikes_sum += out_t.float()
+class SensoryNoveltyModule:
+    def __init__(self, novelty_threshold=0.5):
+        self.novelty_threshold = novelty_threshold
+        self.place_memory = {}
 
-        result = output_spikes_sum / time_steps
-        self.last_processed_features = result.detach().cpu().numpy()
-        return result
+    def get_sensory_novelty(self, place_cell_spikes, current_observation):
+        if place_cell_spikes.sum() == 0:
+            return 1.0
+
+        place_cell_index = torch.argmax(place_cell_spikes).item()
+
+        if place_cell_index not in self.place_memory:
+            return 0.9
+
+        remembered_obs = self.place_memory[place_cell_index]
+        current_obs_np = current_observation.detach().cpu().numpy().flatten()
+        remembered_obs_np = remembered_obs.detach().cpu().numpy().flatten()
+
+        if current_obs_np.shape != remembered_obs_np.shape:
+            return 1.0 # Error de forma, tratar como máxima novedad
+
+        sensory_error = np.linalg.norm(current_obs_np - remembered_obs_np)
+        return min(sensory_error, 1.0) # Normalizar para que no sea mayor a 1
+
+    def update_memory(self, place_cell_spikes, current_observation):
+        if place_cell_spikes.sum() > 0:
+            place_cell_index = torch.argmax(place_cell_spikes).item()
+            if place_cell_index not in self.place_memory:
+                self.place_memory[place_cell_index] = current_observation.clone()
+
+# ------------------------- #
+# --- MÓDULOS DEL AGENTE -- #
+# ------------------------- #
 
 
 class NeoCortex:
-    def __init__(
-        self,
-        env_info,
-        context_name,
-        snn_hippocampus_processor,
-        difficulty="simple",
-        save_path="./models",
-        explore=False
-    ):
+    def __init__(self, env_info, context_name, difficulty="simple", save_path="./models"):
         self.context_name = context_name
         self.save_path = Path(save_path)
         self.env_info = env_info
-        self.snn_hippocampus_processor = snn_hippocampus_processor
-        self.name = f"PPO-{context_name}"
-        self.explore = explore
+        self.name = f"DQN-{difficulty}-{context_name}"
         self.difficulty = difficulty
-        self.config = self._get_config()
-        self.model = self.config.build()
+        self.model = self._get_config()
 
     def _get_config(self):
-        config = PPOConfig()
-        config.environment(
-            env="visual_env",
-            env_config=self.env_info.get('config')
-        )
+        dqn_config = DQNConfig(learning_rate=3e-4, gamma=0.99, n_critics=1)
+        dqn = dqn_config.create(device="cpu:0")
 
-        return config
+        env = self.env_info.get('env')
+        dqn.build_with_env(env)
 
-    def update_from_learner(self, weights):
-        self.model.set_weights(weights)
+        return dqn
 
     def predict(self, raw_obs):
-        module = self.model.get_module("default_policy")
-
-        obs_array = torch.tensor([raw_obs], dtype=torch.float32)
-        output = module.forward_inference({"obs": obs_array})
-
-        if 'actions' in output:
-            return output.get('actions')
-
-        logits = output["action_dist_inputs"]
-        dist = D.Categorical(logits=logits)
-        return dist.sample().item()
+        return self.model.predict(np.expand_dims(raw_obs, axis=0))
 
     def load(self, path):
         try:
-            self.config = self._get_config()
-            self.model = self.config.build()
-
-            self.model.restore(str(path))
-            print(f"Model weights for {self.name} loaded from {path}")
+            self.model.load_model(str(path))
         except Exception as e:
-            print(f"Failed to restore model weights for {self.name} from {path}: {e}. Model initialized with new weights.")
+            print("exception error", e)
 
     def save(self, path=None):
         if self.model is None:
-            raise ValueError(
-                "Agent not initialized. Train or load a model first."
-            )
-
+            raise ValueError("Agent not initialized.")
         self.save_path.mkdir(parents=True, exist_ok=True)
-        save_to = Path(path) if path else self.save_path / f"{self.name}_{self.difficulty}"
-        self.model.save(str(save_to))
-        print(f"Model saved to {save_to}")
+        save_to = Path(path) if path else self.save_path / f"{self.name}_{self.difficulty}.d3"
+        self.model.save_model(str(save_to))
 
 
 class Hippocampo:
-    def __init__(
-        self,
-        env_info: dict,
-        difficulty,
-        snn_output_dim: int = 128,
-        context_threshold=1.0,
-        fast_change_threshold=1.5
-    ):
-        self.env = env_info.get('env')
+    def __init__(self, env_info: dict, difficulty: str, snn_output_dim: int = 256):
         self.env_info = env_info
+        self.env = env_info.get('env')
+        self.difficulty = difficulty
         self.snn_output_dim = snn_output_dim
 
-        snn_input_shape = self.env.observation_space.shape
+        snn_device = "cuda" if torch.cuda.is_available() else "cpu"
+        self.grid_module = GridCellModule(map_size=(32, 32), device=snn_device)
+        self.place_module = PlaceCellModule(num_place_cells=snn_output_dim, device=snn_device)
+        self.novelty_module = SensoryNoveltyModule(novelty_threshold=0.3)
 
-        self.snn_feature_extractor = SNNFeatureExtractor(
-            snn_input_shape,
-            snn_output_dim
-        )
-        self.context_threshold = context_threshold
-        self.fast_change_threshold = fast_change_threshold
-
-        if torch.cuda.is_available():
-            self.snn_feature_extractor.to(torch.device("cuda"))
-
-        self.last_detection_info = {}
-        self.last_prediction_info = {}
+        self.action_map = {0: (-1, 0), 1: (0, 1), 2: (1, 0), 3: (0, -1)}
         self.experts = {}
-        self.current_context = None
-        self.expert_in_training = None
+        self.current_context = "context_default"
         self.known_contexts_features = []
         self.context_threshold = 0.4
 
-        self.context_history = []
-        self.total_context_steps = 0
+    def _action_to_velocity(self, action):
+        return self.action_map.get(action, (0, 0))
 
-        self.last_feature_for_detection = None
-        
-        self.difficulty = difficulty
+    def reset_episode(self):
+        initial_observation, info = self.env.reset()
+        self.grid_module.reset()
+        return torch.tensor(initial_observation, dtype=torch.float32), info
 
-        # Para memoria a corto plazo en detección de contexto
-        self.feature_buffer_size = 3
-        self.recent_features_buffer = collections.deque(
-            maxlen=self.feature_buffer_size
-        )
-
-    def reset_episode_memory(self):
-        self.recent_features_buffer.clear()
-        print("Hippocampo's short-term feature buffer cleared for new episode.")
-
-    def detect_context(self, obs):
-        self.last_raw_observation_for_detection = obs
-
-        device = next(self.snn_feature_extractor.parameters()).device
-        observation_tensor = self._to_tensor(obs).to(device)
-        feature_vector = self._extract_features(observation_tensor)
-
-        self.recent_features_buffer.append(feature_vector)
-        avg_feature = np.mean(self.recent_features_buffer, axis=0) if self.recent_features_buffer else feature_vector
-
-        obstacle_count = self._get_obstacle_count()
-        full_feature = np.concatenate([avg_feature, [obstacle_count]])
-
-        # Cambio abrupto en el contexto
-        if self.last_feature_for_detection is not None:
-            delta = np.linalg.norm(full_feature - self.last_feature_for_detection)
-            if delta > self.fast_change_threshold:
-                print(f"[INFO] Cambio abrupto detectado: Δ={delta:.2f} (contexto actual: {self.current_context})")
-        self.last_feature_for_detection = full_feature
-
-        context_name, distance, distance_list = self._compare_with_known_contexts(full_feature)
-        is_new = context_name is None or distance > self.context_threshold
-
-        if is_new:
-            context_name = self._register_new_context(full_feature)
-
-        self._store_detection_info(feature_vector, avg_feature, full_feature, distance_list, context_name, is_new)
-        self.current_context = context_name
-        return context_name
-
-    def _to_tensor(self, obs):
-        if isinstance(obs, torch.Tensor):
-            return obs.float()
-        try:
-            return torch.tensor(obs, dtype=torch.float32)
-        except Exception as e:
-            print(f"[ERROR] Fallo al convertir obs a tensor. Tipo: {type(obs)}, Contenido: {obs}")
-            raise e
-
-    def _extract_features(self, tensor_obs):
-        spikes = self.snn_feature_extractor(tensor_obs, time_steps=8)
-        return spikes.mean(dim=0).detach().cpu().numpy()
-
-    def _get_obstacle_count(self):
-        if hasattr(self.env, 'get_obstacle_count') and callable(getattr(self.env, 'get_obstacle_count')):
-            return self.env.get_obstacle_count()
-        return 0
-
-    def _compare_with_known_contexts(self, feature):
-        min_distance = float('inf')
-        closest_context = None
-        distances = []
-
-        for name, known_feat in self.known_contexts_features:
-            dist = np.linalg.norm(feature - known_feat)
-            distances.append((name, dist))
-            if dist < min_distance:
-                min_distance = dist
-                closest_context = name
-
-        return closest_context, min_distance, distances
-
-    def _register_new_context(self, feature):
-        name = f"laberinto_C{len(self.known_contexts_features) + 1}"
-        self.known_contexts_features.append((name, feature))
-        return name
-
-    def _store_detection_info(self, snn_features, avg_features, final_feature, distances, context_name, is_new):
-        last_shape = getattr(self.snn_feature_extractor, 'last_raw_observation_processed', None)
-        detection_info = {
-            "raw_obs_shape_for_snn": last_shape.shape if last_shape is not None else "N/A",
-            "snn_features_current_obs": snn_features,
-            "avg_features_from_buffer": avg_features,
-            "final_feature_for_detection": final_feature,
-            "known_contexts_count": len(self.known_contexts_features),
-            "distances_to_known_contexts": distances,
-            "context_threshold": self.context_threshold,
-            "detected_context_name": context_name,
-            "is_new_context": is_new,
-            "feature_buffer_len": len(self.recent_features_buffer),
-            "step": self.total_context_steps
-        }
-
-        self.last_detection_info = detection_info
-        self.context_history.append({
-            "step": self.total_context_steps,
-            "context": context_name,
-            "features": final_feature.tolist()
-        })
-        self.total_context_steps += 1
-
-    def save_context_history_csv(self, filename="context_history.csv"):
-        df = pd.DataFrame(self.context_history)
-        df.to_csv(filename, index=False)
-        print(f"[INFO] Historial de contextos guardado en: {filename}")
-
-    def save_context_history_pickle(self, filename="context_history.pkl"):
-        with open(filename, 'wb') as f:
-            pickle.dump(self.context_history, f)
-        print(f"[INFO] Historial de contextos guardado en: {filename}")
-
-    def get_expert(self, context_name: str, difficulty: str = "simple"):
+    def get_expert(self, context_name: str):
         if context_name not in self.experts:
             self.experts[context_name] = NeoCortex(
                 self.env_info,
                 context_name,
-                self.snn_feature_extractor,
-                difficulty=difficulty
+                self.difficulty
             )
         return self.experts[context_name]
 
-    def train(
-        self,
-        max_steps=100
-    ):
-        env = self.env_info.get('env')
-        state, _ = env.reset()
-        paths = []
-        success = False
+    def _detect_context(self, place_cell_spikes):
+        if place_cell_spikes.sum() == 0:
+            return "context_unknown"
 
-        for _ in range(max_steps):
-            # Exploración pura: acción aleatoria (mejorar con SNN)
-            action = random.choice(env.get_valid_actions())
-            obs, reward, terminated, truncated, _ = env.step(action)
-            done = terminated or truncated
+        feature_vec = place_cell_spikes.detach().cpu().numpy().flatten()
+        min_dist = float('inf')
+        detected_context = None
 
-            paths.append({
-                "obs": state,
-                "action": action,
-                "reward": reward,
-                "terminated": terminated,
-                "truncated": truncated
-            })
+        for name, known_feat in self.known_contexts_features:
+            dist = np.linalg.norm(feature_vec - known_feat)
+            if dist < min_dist:
+                min_dist = dist
+                detected_context = name
 
-            state = obs
+        if detected_context is None or min_dist > self.context_threshold:
+            new_name = f"context_{len(self.known_contexts_features)}"
+            self.known_contexts_features.append((new_name, feature_vec))
+            return new_name
+        return detected_context
 
-            if done:
-                success = True
-                break
+    def train(self):
+        obs, info = self.reset_episode()
+        print(info)
+        terminated, truncated = False, False
+        trajectory = []
 
-        context_name = self.detect_context(state)
+        total_episode_reward = 0
 
-        if success:
-            obs = [np.array(step["obs"]).flatten().tolist() for step in paths]
-            actions = [step["action"] for step in paths]
-            rewards = [step["reward"] for step in paths]
-            terminateds = [step["terminated"] for step in paths]
-            truncateds = [step["truncated"] for step in paths]
+        while not (terminated or truncated):
+            grid_spikes = self.grid_module.get_current_spikes()
+            place_spikes = self.place_module(grid_spikes)
+            novelty_score = self.novelty_module.get_sensory_novelty(place_spikes, obs)
 
-            next_obs = obs[1:] + [obs[-1]]
+            if novelty_score > self.novelty_module.novelty_threshold:
+                action = self.env.action_space.sample()
+            else:
+                self.current_context = self._detect_context(place_spikes)
+                expert = self.get_expert(self.current_context)
+                action = expert.predict(obs.numpy())[0]
 
-            batch_dict = {
-                SampleBatch.OBS: obs,
-                SampleBatch.ACTIONS: actions,
-                SampleBatch.REWARDS: rewards,
-                SampleBatch.TERMINATEDS: terminateds,
-                SampleBatch.TRUNCATEDS: truncateds,
-                SampleBatch.NEXT_OBS: next_obs,
-                SampleBatch.EPS_ID: [0] * len(obs),
-                SampleBatch.AGENT_INDEX: [0] * len(obs),
-                SampleBatch.T: list(range(len(obs))),
-            }
+            next_obs, reward, terminated, truncated, info = self.env.step(action)
+            next_obs = torch.tensor(next_obs, dtype=torch.float32)
 
-            df = pd.DataFrame(batch_dict)
+            total_episode_reward += reward
 
-            data_path = "mi_datos_offline.parquet"
-            df.to_parquet(data_path)
-            print(f"SampleBatch guardado en: {data_path}")
+            velocity_vector = self._action_to_velocity(action)
+            self.grid_module.update_state(velocity_vector)
 
-            return self._attempt_transfer(data_path, context_name)
-        else:
-            print("Exploración fallida, no se guarda experiencia.")
+            next_grid_spikes = self.grid_module.get_current_spikes()
+            next_place_spikes = self.place_module(next_grid_spikes)
+            self.novelty_module.update_memory(next_place_spikes, next_obs)
 
-        return 0
+            trajectory.append((obs.numpy(), action, reward, next_obs.numpy(), terminated, truncated))
+            obs = next_obs
 
-    def _attempt_transfer(self, batch_file,  context_name: str):
-        """Pasa experiencia a experto."""
-        # expert: NeoCortex = self.get_expert(context_name, self.difficulty)
-        # self.expert_in_training = expert
+        if trajectory:
+            print(trajectory)
+            self._train_expert_with_trajectory(
+                trajectory,
+                self.current_context
+            )
 
-        config = (
-            PPOConfig()
-                .environment(
-                    env="visual_env",
-                    env_config=self.env_info.get('config'),
-                    action_space=gym.spaces.Discrete(4),
-                    observation_space=gym.spaces.Box(
-                        low=0,
-                        high=4 - 1,
-                        shape=(2,), dtype=np.float32
-                    )
-                )
-                .learners(num_learners=2)
-                .env_runners(num_env_runners=2)
-                .offline_data(
-                    input_="file://" + batch_file
-                )
-                .training(
-                    train_batch_size=256,
-                    gamma=0.99
-                )
-                .build()
+        print("Training  episode finished.")
+        return total_episode_reward
+
+    def _train_expert_with_trajectory(self, trajectory, context_name):
+        expert = self.get_expert(context_name)
+
+        observations = np.array([t[0] for t in trajectory])
+        actions = np.array([t[1] for t in trajectory])
+        rewards = np.array([t[2] for t in trajectory])
+        terminals = np.array([t[4] for t in trajectory])
+        timeouts = np.array([t[5] for t in trajectory])
+
+        dataset = MDPDataset(
+            observations=observations,
+            actions=actions,
+            rewards=rewards,
+            terminals=terminals,
+            timeouts=timeouts
         )
+        expert.model.fit(dataset, n_steps=1000)
 
-        return config.train()
-
-    def stop_experts(self):
-        if self.expert_in_training and hasattr(self.expert_in_training.model, 'stop'):
-            self.expert_in_training.model.stop()
-        for expert_name in list(self.experts.keys()):
-            expert = self.experts[expert_name]
-            if hasattr(expert.model, 'stop'):
-                expert.model.stop()
-
-    def predict(self, raw_obs):
-        if self.current_context is None:
-            print("Advertencia: Contexto no detectado previamente. Intentando detectar ahora.")
-            obs_for_detection = raw_obs
-            if isinstance(raw_obs, np.ndarray) and raw_obs.ndim == len(self.snn_feature_extractor.input_shape):
-                obs_for_detection = np.expand_dims(raw_obs, axis=0)
-            elif isinstance(raw_obs, torch.Tensor) and raw_obs.ndim == len(self.snn_feature_extractor.input_shape):
-                obs_for_detection = raw_obs.unsqueeze(0)
-
-            self.detect_context(obs_for_detection)
-            if self.current_context is None:
-                raise ValueError("Contexto aún no detectado después del intento. Llama a detect_context explícitamente.")
-
-        expert: NeoCortex = self.get_expert(self.current_context)
-        action = expert.predict(raw_obs)
-
-        self.last_prediction_info = {
-            "raw_obs_shape_for_snn": self.snn_feature_extractor.last_raw_observation_processed.shape if self.snn_feature_extractor.last_raw_observation_processed is not None else "N/A",
-            "snn_output_features_for_expert": self.snn_feature_extractor.last_processed_features if self.snn_feature_extractor.last_processed_features is not None else "N/A",
-            "expert_used": self.current_context,
-            "predicted_action": action
-        }
-        return action
+    def predict(self, obs):
+        grid_spikes = self.grid_module.get_current_spikes()
+        place_spikes = self.place_module(grid_spikes)
+        self.current_context = self._detect_context(place_spikes)
+        expert = self.get_expert(self.current_context)
+        if isinstance(obs, torch.Tensor):
+            obs = obs.numpy()
+        return expert.predict(obs)[0]
 
     def save(self, path):
         path = Path(path)
         path.mkdir(parents=True, exist_ok=True)
-        torch.save(
-            self.known_contexts_features,
-            path / "known_contexts_features.pt"
-        )
-        torch.save(
-            self.snn_feature_extractor.state_dict(),
-            path / "snn_feature_extractor.pt"
-        )
-        for context_name, expert_instance in self.experts.items():
-            expert_instance.save(
-                path
-            )
+
+        torch.save(self.grid_module.state_dict(), path / "grid_module.pt")
+        torch.save(self.place_module.state_dict(), path / "place_module.pt")
+
+        for name, expert in self.experts.items():
+            expert.save(path / f"expert_{name}.d3")
+    
+        with open(path / "known_contexts.pkl", "wb") as f:
+            pickle.dump(self.known_contexts_features, f)
+        with open(path / "place_memory.pkl", "wb") as f:
+            pickle.dump(self.novelty_module.place_memory, f)
 
     def load(self, path):
         path = Path(path)
-        if not path.exists():
-            return
+        if not path.exists(): return
 
-        if (path / "known_contexts_features.pt").exists():
-            self.known_contexts_features = torch.load(path / "known_contexts_features.pt")
+        if (path / "grid_module.pt").exists():
+            self.grid_module.load_state_dict(torch.load(path / "grid_module.pt"))
+        if (path / "place_module.pt").exists():
+            self.place_module.load_state_dict(torch.load(path / "place_module.pt"))
+   
+        for expert_file in path.glob("expert_*.d3"):
+            name = '_'.join(expert_file.stem.split('_')[1:])
+            expert = self.get_expert(name)
+            expert.load(expert_file)
 
-        snn_weights_path = path / "snn_feature_extractor.pt"
-        if snn_weights_path.exists():
-            device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-            self.snn_feature_extractor.load_state_dict(torch.load(snn_weights_path, map_location=device))
-            self.snn_feature_extractor.to(device)
-
-        for context_dir_name, _ in self.known_contexts_features:
-            expert_context_path = path / context_dir_name
-            if expert_context_path.is_dir():
-                difficulty_of_expert = "simple"
-                checkpoint_name_pattern = f"PPO-{context_dir_name}_{difficulty_of_expert}"
-                potential_checkpoint_path = expert_context_path / checkpoint_name_pattern
-
-                if potential_checkpoint_path.exists():
-                    expert_instance = NeoCortex(self.env_info, context_dir_name, self.snn_feature_extractor, difficulty=difficulty_of_expert)
-                    expert_instance.load(path=potential_checkpoint_path)
-                    self.experts[context_dir_name] = expert_instance
-                else:
-                    print(
-                        f"Advertencia: Checkpoint para experto {context_dir_name} con dificultad {difficulty_of_expert} no encontrado en {potential_checkpoint_path}"
-                    )
+        if (path / "known_contexts.pkl").exists():
+            with open(path / "known_contexts.pkl", "rb") as f:
+                self.known_contexts_features = pickle.load(f)
+        if (path / "place_memory.pkl").exists():
+            with open(path / "place_memory.pkl", "rb") as f:
+                self.novelty_module.place_memory = pickle.load(f)
 
 
 class CPAgent:
-    def __init__(
-        self,
-        name,
-        difficulty,
-        env_info,
-        save_path="./models",
-        explore=False
-    ):
+    def __init__(self, name, difficulty, env_info, save_path="./models"):
         self.difficulty = difficulty
         self.model_name = name
-
         self.save_path = Path(save_path)
         os.makedirs(self.save_path, exist_ok=True)
-
         self.learner = Hippocampo(env_info, difficulty)
-        self.learner.load(self.save_path)
-        self.text_generator = None
-
-        self.explore = explore
+        self.load()
 
     def train(self):
         return self.learner.train()
@@ -504,11 +303,9 @@ class CPAgent:
     def save(self, path):
         self.learner.save(path)
 
-    def load(self):
-        self.learner.load(self.save_path)
-
-    def stop(self):
-        self.learner.stop_experts()
+    def load(self, path=None):
+        load_location = path if path is not None else self.save_path
+        self.learner.load(load_location)
 
 
 class Explanation:

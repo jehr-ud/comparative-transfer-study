@@ -1,16 +1,16 @@
 from pathlib import Path
 
 
-from agents.ray_agent import (
-    RLLibAgent as PPO,
-    RLLibAgent as IMPALA,
-    RLLibAgent as DQN
+from agents.base_agent import (
+    ClassicalAgent as PPO,
+    ClassicalAgent as A2C,
+    ClassicalAgent as DQN
 )
 from agents.q_learning import QLearning
 from agents.imitation_agent import ImitationMarWilTransfer
 from agents.cpa_agent import CPAgent
 
-from stages.train.agents.base_classical_agent import train_rllib_agent
+from stages.train.agents.base_classical_agent import train_basical_agent
 from stages.train.agents.expert_learner_agent import train_agent
 from stages.train.agents.imitation_transfer import (
     train_imitation_transfer_agent
@@ -29,7 +29,7 @@ simple_env_conf = {
     "name": "simple",
     "size": 6,
     "obstacles": [(1, 1), (2, 3), (3, 1)],
-    "render_mode": None,
+    "render_mode": 'None',
     "shared_window": None
 }
 
@@ -74,13 +74,13 @@ complex_env_info = {
 envs = [
     simple_env_info,
     medium_env_info,
-    # complex_env_info
+    complex_env_info
 ]
 
 ppo = {
     "name": "PPO",
     "class": PPO,
-    "train_function": train_rllib_agent,
+    "train_function": train_basical_agent,
     "params_predict": {},
     "type": "classical",
 }
@@ -96,15 +96,15 @@ qlearning = {
 dqn = {
     "name": "DQN",
     "class": DQN,
-    "train_function": train_rllib_agent,
+    "train_function": train_basical_agent,
     "params_predict": {},
     "type": "classical",
 }
 
-impala = {
-    "name": "IMPALA",
-    "class": IMPALA,
-    "train_function": train_rllib_agent,
+a2c = {
+    "name": "A2C",
+    "class": A2C,
+    "train_function": train_basical_agent,
     "params_predict": {},
     "type": "classical",
 }
@@ -113,7 +113,7 @@ classical_algorithms = [
     ppo,
     dqn,
     qlearning,
-    impala
+    a2c
 ]
 
 
@@ -143,6 +143,7 @@ cpa = {
 }
 
 transfer_algorithms = [
+    # marwil,
     cpa
 ]
 
@@ -181,22 +182,22 @@ transfer_experiments = [
             },
         ],
     },
-    #{
-    #    "target_env": medium_env_info,
-    #    "source_model_paths": [
-    #        {
-    #            "difficulty": "medium",
-    #            "path": str(Path("models") / "{model}_medium"),
-    #        },
-    #    ],
-    #},
-    #{
-    #    "target_env": complex_env_info,
-    #    "source_model_paths": [
-    #        {
-    #            "difficulty": "complex",
-    #            "path": str(Path("models") / "{model}_complex"),
-    #        },
-    #    ],
-    #},
+    {
+        "target_env": medium_env_info,
+        "source_model_paths": [
+            {
+                "difficulty": "medium",
+                "path": str(Path("models") / "{model}_medium"),
+            },
+        ],
+    },
+    {
+        "target_env": complex_env_info,
+        "source_model_paths": [
+            {
+                "difficulty": "complex",
+                "path": str(Path("models") / "{model}_complex"),
+            },
+        ],
+    },
 ]

@@ -1,9 +1,4 @@
-import gc
-import atexit
-
 from environments.visual_maze_env import VisualMazeEnv
-import ray
-from ray.tune.registry import register_env
 
 from stages.evaluation import (
     evaluate_agent,
@@ -30,10 +25,6 @@ def run_training_and_evaluation(
         curves_dict = {}
 
         for algorithm in algorithms:
-            if not ray.is_initialized():
-                ray.init(include_dashboard=False)
-
-            register_env("visual_env", env_creator)
 
             algo_name = f"{algorithm.get('name')}"
 
@@ -55,7 +46,8 @@ def run_training_and_evaluation(
 
             print("📊 Evaluation starting..")
 
-            file_results = f"{experiment_number}_{algo_name}_{env_name}_metrics.csv"
+            base_path = f"{experiment_number}_{algo_name}_{env_name}"
+            file_results = f"{base_path}_metrics.csv"
             path = f"results/{type_algorithms}/{file_results}"
 
             if agent:
@@ -71,26 +63,15 @@ def run_training_and_evaluation(
                 )
                 print("📊 Evaluation finished")
 
-            if hasattr(agent, "env") and agent.env is not None:
-                try:
-                    agent.env.close()
-                except Exception as e:
-                    print(f"Could not close environment: {e}")
-
-            if hasattr(agent, "stop"):
-                try:
-                    agent.stop()
-                except Exception as e:
-                    print(f"[ERROR] Could not stop model: {e}")
-
+        path = f"results/{type_algorithms}/{experiment_number}"
         plot_learning_curves(
             env_name,
             curves_dict,
-            f"results/{type_algorithms}/{experiment_number}_learning_curves_{env_name}.png"
+            f"{path}_learning_curves_{env_name}.png"
         )
         save_learning_curves(
             curves_dict,
-            f"results/{type_algorithms}/{experiment_number}_learning_curves_{env_name}.csv"
+            f"{path}_learning_curves_{env_name}.csv"
         )
 
     return curves_dict
@@ -103,11 +84,6 @@ def run_transfer_comparation(
 ):
     # transfer evaluation
     print("\n🔄 Transfer learning evaluation")
-    if not ray.is_initialized():
-        ray.init(include_dashboard=False)
-        atexit.register(ray.shutdown)
-
-    register_env("visual_env", env_creator)
 
     for algorithm in algorithms:
         evaluate_transfer_learning(
@@ -117,6 +93,3 @@ def run_transfer_comparation(
             "transfer",
             experiment_number
         )
-
-    ray.shutdown()
-    gc.collect()

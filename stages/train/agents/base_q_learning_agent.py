@@ -1,9 +1,20 @@
 from agents.q_learning import QLearning
 from stages.utils import (
     load_progress,
-    get_max_iterations,
     save_progress
 )
+
+config = {
+    "simple": {
+        "total_episodes": 500_000,
+    },
+    "medium": {
+        "total_episodes": 750_000,
+    },
+    "complex": {
+        "total_episodes": 1_000_000
+    }
+}
 
 
 def train_q_learning_agent(
@@ -20,24 +31,22 @@ def train_q_learning_agent(
 
     print(f"Train: {model_name} in {difficulty}")
 
-    start_iteration = load_progress(model_name, difficulty, experiment_number)
-    max_iterations = get_max_iterations(difficulty)
+    start_episode = load_progress(model_name, difficulty, experiment_number)
+    total_episodes = config.get(difficulty).get("total_episodes")
 
-    episode = start_iteration
-
-    while episode < max_iterations:
+    for episode in range(start_episode, total_episodes):
         obs, _ = env.reset()
         total_reward = 0
         done = False
 
         while not done:
-            action_list, _ = model.predict(obs, deterministic=False)
-
+            state = obs
+            action_list, _ = model.predict(state, deterministic=False)
             obs, reward, terminated, truncated, _ = env.step(action_list)
+            next_state = obs
             done = terminated or truncated
 
-            next_state = obs
-            model.learn(obs, action_list, reward, next_state, done)
+            model.learn(state, action_list, reward, next_state, done)
             total_reward += reward
 
         model.decay_epsilon()
@@ -45,7 +54,7 @@ def train_q_learning_agent(
 
         if (episode + 1) % 500 == 0:
             print(
-                f"Episode {episode}: Total Reward: {total_reward}, "
+                f"Episode {episode + 1}: Total Reward: {total_reward}, "
                 f"Epsilon: {model.epsilon:.4f}"
             )
 
@@ -56,8 +65,8 @@ def train_q_learning_agent(
             else:
                 print("Could not discretize initial state for debug.")
 
-        save_progress(episode + 1, model_name, difficulty, experiment_number)
-        episode += 1
+        if (episode + 1) % 1000 == 0 or (episode + 1) == total_episodes:
+            save_progress(episode + 1, model_name, difficulty, experiment_number)
 
     model_path = f"models/{experiment_number}_{model_name}_{difficulty}.pkl"
     model.save(model_path)

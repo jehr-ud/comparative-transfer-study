@@ -5,16 +5,18 @@ import pygame
 from PIL import Image
 import numpy as np
 
+from environments.visual_maze_env import VisualMazeEnv
 from .utils import load_model, get_env_by_name
 
 
 def run_agent_episode_and_record_gif(
     model_name,
     agent,
-    env,
+    env_info,
     gif_path="maze_run.gif",
     sleep_time=0.1
 ):
+    env = env_info.get('env')
     obs, info = env.reset()
     done = False
     frames = []
@@ -63,6 +65,10 @@ def run_agent_episode_and_record_gif(
     )
 
 
+def env_creator(env_config):
+    return VisualMazeEnv(env_config)
+
+
 def show_agent(algoritmhs, difficulty, envs):
     pygame.init()
 
@@ -76,8 +82,10 @@ def show_agent(algoritmhs, difficulty, envs):
         model_name = algoritmh.get('name')
         env = get_env_by_name(difficulty, envs)
 
-        env['render_mode'] = 'human'
-        env['shared_window'] = screen
+        env['config']['render_mode'] = 'human'
+        env['config']['shared_window'] = screen
+
+        env['env'] = env_creator(env['config'])
 
         if env:
             print(f"Env found: {env}")
@@ -86,12 +94,14 @@ def show_agent(algoritmhs, difficulty, envs):
             return
 
         path_models = str(Path("models"))
-        model_path = f"{path_models}/{model_name}_{difficulty}"
+        model_path = f"{path_models}/2_{model_name}_{difficulty}/2_{model_name}_{difficulty}"
 
         print(f"Loading {model_path}")
         agent = load_model(
+                model_name,
                 model_path,
                 algoritmh.get('class'),
+                difficulty,
                 env
         )
 

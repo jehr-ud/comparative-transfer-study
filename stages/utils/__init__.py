@@ -15,21 +15,20 @@ def load_model(
 
     Args:
         model_path (str): Path to the saved model file.
-        model_class (class): The class of the model to load (e.g., PPO, QLearning).
-        env (gym.Env, optional): The environment, required for models like QLearning.
+        model_class (class): The class of the model to load.
+        env (gym.Env, optional): The environment.
 
     Returns:
         model: An instance of the loaded model.
     """
-    # QLearning models require the environment to be passed during instantiation
+    # QLearning models require the environment
     if model_class.__name__ == "QLearning":
         if env_info is None:
             raise ValueError("QLearning requires an environment to be loaded.")
-        model = model_class(env_info)
+        model = model_class(env_info.get('env'))
         model.load(model_path)
         return model
 
-    # Ray Model
     base_path = f"{model_name}_{difficulty}"
     load_to = Path(model_path) if model_path else model_path / base_path
     load_to = load_to.resolve()
@@ -44,9 +43,9 @@ def get_env_by_name(name, envs):
 
 
 TRAINING_CONFIG = {
-    "simple": {"num_iterations": 800},  # 800
-    "medium": {"num_iterations": 1500},  # 1500
-    "complex": {"num_iterations": 2000}  # 2000
+    "simple": {"num_iterations": 1},
+    "medium": {"num_iterations": 1},
+    "complex": {"num_iterations": 1}
 }
 
 
@@ -60,7 +59,10 @@ def save_progress(iteration, model_name, difficulty, experiment_number):
         "difficulty": difficulty,
         "experiment_number": experiment_number
     }
-    with open(get_progress_file(model_name, experiment_number, difficulty), "w") as f:
+    with open(
+        get_progress_file(model_name, experiment_number, difficulty),
+        "w"
+    ) as f:
         json.dump(progress, f, indent=2)
 
 

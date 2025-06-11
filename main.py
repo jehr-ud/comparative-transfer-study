@@ -1,6 +1,3 @@
-from dotenv import load_dotenv
-load_dotenv()
-
 import os
 import shutil
 import json
@@ -65,11 +62,11 @@ def run_classical_methods(experiment_number):
         "classical",
         experiment_number
     )
-    run_transfer_comparation(
-        classical_algorithms,
-        classical_transfer_experiments,
-        experiment_number
-    )
+    #  run_transfer_comparation(
+    #      classical_algorithms,
+    #      classical_transfer_experiments,
+    #      experiment_number
+    #  )
 
 
 def run_transfer_methods(experiment_number):
@@ -88,17 +85,13 @@ def run_transfer_methods(experiment_number):
 
 
 if __name__ == "__main__":
-    #choice = input(
-    #    "What do you want to run? (classical / transfer): "
-    #).strip().lower()
-    
-    choice = "transfer"
+    choice = input(
+        "What do you want to run? (classical / transfer): "
+    ).strip().lower()
 
-    need_run_experiments = "y"
-    
-    #input(
-    #    "Do you want to train? (y/n): "
-    #).strip().lower()
+    need_run_experiments = input(
+        "Do you want to train? (y/n): "
+    ).strip().lower()
 
     if need_run_experiments == "y":
         progress = load_progress()
@@ -124,8 +117,8 @@ if __name__ == "__main__":
         ).strip().lower()
 
         if choice == "classical":
-            show_agent(classical_algorithms, difficulty)
+            show_agent(classical_algorithms, difficulty, envs)
         elif choice == "transfer":
-            show_agent(transfer_algorithms, difficulty)
+            show_agent(transfer_algorithms, difficulty, envs)
     else:
         print("👋 Bye")

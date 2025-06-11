@@ -1,12 +1,14 @@
 from pathlib import Path
 import os
-import pandas as pd
 import traceback
+
+import ray
 import numpy as np
+import pandas as pd
 
 from stages.utils import load_model
 from agents.imitation_agent import ImitationMarWilTransfer
-from agents.ray_agent import RLLibAgent
+from agents.base_agent import ClassicalAgent
 from stages.utils import (
     load_progress,
     get_max_iterations,
@@ -30,7 +32,11 @@ def train_imitation_transfer_agent(
     generate_demonstrations=True,
     save_path="./models"
 ):
-    print(f"\n🔧 Training {model_name} imitation model for difficulty: {difficulty}")
+    print(
+        f"\n🔧 Training {model_name} imitation model for: {difficulty}"
+    )
+
+    ray.init("auto")
 
     base_path = "models/demonstrations"
     os.makedirs(base_path, exist_ok=True)
@@ -55,7 +61,7 @@ def train_imitation_transfer_agent(
 
     if generate_demonstrations:
         print("📦 Generating expert demonstrations...")
-        expert: RLLibAgent = load_model(
+        expert: ClassicalAgent = load_model(
             expert_name,
             expert_path,
             expert_class,
@@ -79,7 +85,9 @@ def train_imitation_transfer_agent(
             while not done:
                 obs = np.array(obs)
                 action = expert.predict(obs)
-                next_obs, reward, terminated, truncated, info = env.step(action)
+                next_obs, reward, terminated, truncated, info = env.step(
+                    action
+                )
                 print(info)
                 done = terminated or truncated
 
@@ -98,12 +106,14 @@ def train_imitation_transfer_agent(
         for traj in trajectories:
             length = len(traj["states"])
             for i in range(length):
+                next_ob = traj["states"][i + 1].tolist() \
+                    if i + 1 < length else traj["states"][i].tolist()
                 row = {
                     "obs": traj["states"][i].tolist(),
                     "action": traj["actions"][i],
                     "reward": traj["rewards"][i],
                     "done": traj["dones"][i],
-                    "next_obs": traj["states"][i + 1].tolist() if i + 1 < length else traj["states"][i].tolist(),
+                    "next_obs": next_ob,
                 }
                 df_rows.append(row)
 
@@ -122,8 +132,9 @@ def train_imitation_transfer_agent(
     rewards = []
 
     save_path = Path(save_path).resolve()
-    final_model_path = save_path / f"{experiment_number}_{model_name}_{difficulty}"
-    temp_model_path = save_path / "temporal" / f"{experiment_number}_{model_name}_{difficulty}"
+    base_path = f"{experiment_number}_{model_name}_{difficulty}"
+    final_model_path = save_path / f"{base_path}"
+    temp_model_path = save_path / "temporal" / f"{base_path}"
 
     temp_model_path.mkdir(parents=True, exist_ok=True)
     final_model_path.mkdir(parents=True, exist_ok=True)
@@ -149,14 +160,18 @@ def train_imitation_transfer_agent(
                 print(f"Iteration {i}: Loading model from {temp_model_path}")
                 imitation_model.load(str(temp_model_path))
             else:
-                print(f"Iteration {i}: No previous model found, starting from scratch...")
+                print(f"Iteration {i}: No previous model found...")
 
             imitation_model.load_trajectories(traj_file_path)
 
             result = imitation_model.learn()
-            reward_mean = result.get("module_episode_returns_mean", {}).get("default_policy", None)
+            reward_mean = result.get(
+                "module_episode_returns_mean", {}
+            ).get("default_policy", None)
             if not reward_mean:
-                reward_mean = result.get("env_runners", {}).get("episode_return_mean", 0)
+                reward_mean = result.get(
+                    "env_runners", {}
+                ).get("episode_return_mean", 0)
             rewards.append(reward_mean)
             print(f"[Iter {i}] Mean reward: {reward_mean}")
             i += 1

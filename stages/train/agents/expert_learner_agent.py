@@ -1,6 +1,5 @@
 from pathlib import Path
 from agents.cpa_agent import CPAgent
-from environments.visual_maze_env import VisualMazeEnv
 from stages.utils import (
     load_progress,
     get_max_iterations,
