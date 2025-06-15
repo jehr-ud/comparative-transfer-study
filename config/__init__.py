@@ -8,10 +8,10 @@ from agents.base_agent import (
 )
 from agents.q_learning import QLearning
 from agents.imitation_agent import ImitationMarWilTransfer
-from agents.cpa_agent import CPAgent
+from agents.cit_agent import CITgent
 
 from stages.train.agents.base_classical_agent import train_basical_agent
-from stages.train.agents.expert_learner_agent import train_agent
+from stages.train.agents.cit_agent import train_agent
 from stages.train.agents.imitation_transfer import (
     train_imitation_transfer_agent
 )
@@ -133,8 +133,8 @@ marwil = {
 
 # Perception-Action Agent
 cpa = {
-    "name": "CPA-Agent",
-    "class": CPAgent,
+    "name": "CIT",
+    "class": CITgent,
     "train_function": train_agent,
     "params_predict": {},
     "params_train": {
@@ -153,7 +153,7 @@ classical_transfer_experiments = [
         "source_model_paths": [
             {
                 "difficulty": "simple",
-                "path": str(Path("models") / "{model}_simple"),
+                "path": str(Path("models") / "{experiment}_{model}_simple" / "{experiment}_{model}_simple"),
             }
         ],
     },
@@ -162,11 +162,11 @@ classical_transfer_experiments = [
         "source_model_paths": [
             {
                 "difficulty": "simple",
-                "path": str(Path("models") / "{model}_simple"),
+                "path": str(Path("models") / "{experiment}_{model}_simple" / "{experiment}_{model}_simple"),
             },
             {
                 "difficulty": "medium",
-                "path": str(Path("models") / "{model}_medium"),
+                "path": str(Path("models") / "{experiment}_{model}_medium" / "{experiment}_{model}_medium"),
             },
         ],
     },
@@ -177,8 +177,8 @@ transfer_experiments = [
         "target_env": simple_env_info,
         "source_model_paths": [
             {
-                "difficulty": "simple",
-                "path": str(Path("models") / "{model}_simple"),
+                "difficulty": "complex",
+                "path": str(Path("models") / "{experiment}_{model}_complex"),
             },
         ],
     },
@@ -186,8 +186,8 @@ transfer_experiments = [
         "target_env": medium_env_info,
         "source_model_paths": [
             {
-                "difficulty": "medium",
-                "path": str(Path("models") / "{model}_medium"),
+                "difficulty": "complex",
+                "path": str(Path("models") / "{experiment}_{model}_complex"),
             },
         ],
     },
@@ -196,7 +196,7 @@ transfer_experiments = [
         "source_model_paths": [
             {
                 "difficulty": "complex",
-                "path": str(Path("models") / "{model}_complex"),
+                "path": str(Path("models") / "{experiment}_{model}_complex"),
             },
         ],
     },

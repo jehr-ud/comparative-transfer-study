@@ -142,10 +142,11 @@ def evaluate_transfer_learning(
                 f"[DEBUG] TL evaluation for {model_name} {difficulty}"
             )
 
-            model_path = f"{experiment_number}_{model_path}"
+            model_path = f"{model_path}"
 
             model_path = model_path.format(
-                model=model_name
+                model=model_name,
+                experiment=experiment_number
             )
 
             print(f"Loading {model_path}")

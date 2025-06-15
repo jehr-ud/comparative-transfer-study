@@ -32,7 +32,9 @@ class RewardCallback(BaseCallback):
                 episode_reward = self.locals['infos'][i]['episode']['r']
                 self.rewards.append(episode_reward)
                 if self.verbose > 0:
-                    print(f"Episode finished. Reward: {episode_reward:.2f}, Total episodes: {len(self.rewards)}")
+                    print(
+                        f"Episode finished. Reward: {episode_reward:.2f}, Total episodes: {len(self.rewards)}"
+                    )
         return True
 
 
@@ -69,7 +71,7 @@ class ClassicalAgent:
             return A2C
         else:
             raise ValueError("Agent not configured.")
-        
+
     def setup_model(self):
         """Crea una nueva instancia del modelo. Llamar solo para un entrenamiento nuevo."""
         print(f"Setting up a new '{self.name}' model...")
@@ -85,10 +87,14 @@ class ClassicalAgent:
             raise ValueError("Model is not set up. Call setup_model() or load() first.")
         reward_callback = RewardCallback(verbose=1)
 
-        self.model.learn(total_timesteps=total_timesteps,  callback=reward_callback,reset_num_timesteps=False)
-        reward_mean = reward_callback.rewards[-1] if reward_callback.rewards else 0
+        self.model.learn(
+            total_timesteps=total_timesteps,
+            callback=reward_callback,
+            reset_num_timesteps=False
+        )
+        rewards = reward_callback.rewards if reward_callback.rewards else []
 
-        return reward_mean
+        return rewards
 
     def predict(self, obs):
         action, _ = self.model.predict(obs, deterministic=True)

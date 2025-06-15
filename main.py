@@ -42,15 +42,17 @@ def clean_directories(type):
             print(f"🧹 Cleaned directory: {path}")
 
 
-def load_progress():
-    if os.path.exists(PROGRESS_FILE):
-        with open(PROGRESS_FILE, "r") as f:
+def load_progress(choice):
+    file_name = PROGRESS_FILE.replace(".json", f"{choice}.json")
+    if os.path.exists(file_name):
+        with open(file_name, "r") as f:
             return json.load(f)
-    return {"classical": 0, "transfer": 0}
+    return {"total": 0}
 
 
-def save_progress(progress):
-    with open(PROGRESS_FILE, "w") as f:
+def save_progress(choice, progress):
+    file_name = PROGRESS_FILE.replace(".json", f"{choice}.json")
+    with open(file_name, "w") as f:
         json.dump(progress, f, indent=2)
 
 
@@ -62,11 +64,11 @@ def run_classical_methods(experiment_number):
         "classical",
         experiment_number
     )
-    #  run_transfer_comparation(
-    #      classical_algorithms,
-    #      classical_transfer_experiments,
-    #      experiment_number
-    #  )
+    run_transfer_comparation(
+        classical_algorithms,
+        classical_transfer_experiments,
+        experiment_number
+    )
 
 
 def run_transfer_methods(experiment_number):
@@ -94,9 +96,9 @@ if __name__ == "__main__":
     ).strip().lower()
 
     if need_run_experiments == "y":
-        progress = load_progress()
-        while progress.get(choice, 0) < TOTAL_RUNS:
-            experiment_n = progress[choice] + 1
+        progress = load_progress(choice)
+        while progress.get("total", 0) < TOTAL_RUNS:
+            experiment_n = progress["total"] + 1
 
             print(
                 f"🔁 Running {experiment_n} / {TOTAL_RUNS} for {choice}"
@@ -105,8 +107,8 @@ if __name__ == "__main__":
                 run_classical_methods(experiment_n)
             elif choice == "transfer":
                 run_transfer_methods(experiment_n)
-            progress[choice] += 1
-            save_progress(progress)
+            progress["total"] += 1
+            save_progress(choice, progress)
             print("✅ Done.")
 
         print(f"🏁 Finished {TOTAL_RUNS} runs for {choice}.")

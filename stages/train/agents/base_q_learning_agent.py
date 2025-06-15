@@ -6,13 +6,13 @@ from stages.utils import (
 
 config = {
     "simple": {
-        "total_episodes": 500_000,
+        "total_episodes": 6400,
     },
     "medium": {
-        "total_episodes": 750_000,
+        "total_episodes": 5400,
     },
     "complex": {
-        "total_episodes": 1_000_000
+        "total_episodes": 3400
     }
 }
 

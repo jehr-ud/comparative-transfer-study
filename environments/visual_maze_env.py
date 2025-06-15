@@ -24,7 +24,8 @@ class VisualMazeEnv(gym.Env):
         self.steps_taken = 0
         num_obstacles = len(self.obstacles) \
             if isinstance(self.obstacles, list) else 1
-        steps_constant = 2
+
+        steps_constant = 3
         self.max_steps = steps_constant * (self.size ** 2 + 2 * num_obstacles)
 
         self.num_obstacles = num_obstacles
@@ -58,9 +59,10 @@ class VisualMazeEnv(gym.Env):
 
     def get_valid_actions(self, current_pos=None):
         """
-        Calcula y retorna una lista de acciones válidas desde la posición actual
-        del agente.
-        Las acciones se definen como: 0: Arriba, 1: Derecha, 2: Abajo, 3: Izquierda.
+        Calcula y retorna una lista de acciones válidas 
+        desde la posición actual del agente.
+        Las acciones se definen como:
+        0: Arriba, 1: Derecha, 2: Abajo, 3: Izquierda.
         """
         if current_pos is None:
             current_pos = self.agent_pos

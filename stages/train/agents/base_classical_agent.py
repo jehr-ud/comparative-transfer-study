@@ -1,10 +1,6 @@
 from pathlib import Path
 import time
 
-from stable_baselines3.common.callbacks import BaseCallback
-import numpy as np
-from stable_baselines3.common.evaluation import evaluate_policy
-
 from agents.base_agent import ClassicalAgent
 from stages.utils import (
     load_progress,
@@ -122,9 +118,7 @@ def train_basical_agent(
     while i < max_iterations:
         try:
             print(f"--- Starting Iteration {i}/{max_iterations-1} ---")
-            reward_mean = agent.train(total_timesteps_per_iteration)
-            rewards.append(reward_mean)
-            print(f"Iteration {i}, Average Reward: {reward_mean:.2f}")
+            rewards = agent.train(total_timesteps_per_iteration)
 
             agent.save(str(temp_model_file))
             save_progress(i + 1, model_name, difficulty, experiment_number)
