@@ -17,11 +17,9 @@ class CITgent:
         self.hippocampus = {}  # Grafo del hipocampo
         self.goal = env_info.get("goal")
         self.last_position = None
-        self.explored = set()
-        self.memory_replay = []  # Neocorteza: rutas con recompensa
         self.familiarity = defaultdict(int)
         self.cortical_memory = [] # Lista de rutas consolidadas
-        
+
         self.previous_position = None # Memoria del paso inmediatamente anterior para evitar el ping-pong
 
     def consolidate(self, path, total_reward):
@@ -147,7 +145,6 @@ class CITgent:
         return []  # No path found
 
     def update_hippocampus(self, current, next_pos):
-        self.explored.add(current)
         self.familiarity[next_pos] += 1  # +1 cada vez que se visita
         self.familiarity[current] += 1
 
@@ -171,13 +168,13 @@ class CITgent:
         for action in valid_actions:
             dx, dy = directions[action]
             neighbor = (position[0] + dx, position[1] + dy)
-            
+
             # <<<<<<< LÓGICA ANTI-PING-PONG EN EXPLORACIÓN >>>>>>>>
             if neighbor == prev_pos:
                 novelty_score = -1.0
             else:
                 novelty_score = 1 / (1 + self.familiarity.get(neighbor, 0) ** 2)
-                
+   
             scored_moves.append((novelty_score, action))
 
         if random.random() < epsilon:
