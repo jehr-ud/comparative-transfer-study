@@ -8,7 +8,7 @@ from stages.utils import (
 
 config = {
     "simple": {
-        "total_timesteps": 1000,
+        "total_timesteps": 2_000,
     },
     "medium": {
         "total_timesteps": 2_000,
@@ -64,8 +64,15 @@ def train_agent(
         print(f"[INFO] Loading model from: {temp_model_file}")
         agent.load(str(temp_model_file))
 
+    initial_epsilon = 1.0
+    min_epsilon = 0.01
+    epsilon_decay_rate = 0.995
+    current_epsilon = initial_epsilon
+
     for episode_num in range(start_iteration, episodes):
-        reward = agent.train()
+        current_epsilon = max(min_epsilon, initial_epsilon * (epsilon_decay_rate ** episode_num))
+        reward = agent.train(epsilon=current_epsilon)
+
         rewards.append(reward)
 
         save_progress(
@@ -80,7 +87,7 @@ def train_agent(
         )
 
         print(
-            f"Episode {episode_num + 1}. Reward: {reward}"
+            f"Episode {episode_num + 1}. Epsilon: {current_epsilon:.4f}. Reward: {reward}"
         )
         episode += 1
 
