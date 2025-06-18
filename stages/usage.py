@@ -94,7 +94,7 @@ def show_agent(algoritmhs, difficulty, envs):
             return
 
         path_models = str(Path("models"))
-        model_path = f"{path_models}/2_{model_name}_{difficulty}/2_{model_name}_{difficulty}"
+        model_path = f"{path_models}/1_{model_name}_{difficulty}"
 
         print(f"Loading {model_path}")
         agent = load_model(

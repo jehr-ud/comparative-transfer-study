@@ -73,8 +73,8 @@ complex_env_info = {
 
 envs = [
     simple_env_info,
-    medium_env_info,
-    complex_env_info
+    # medium_env_info,
+    # complex_env_info
 ]
 
 ppo = {
@@ -177,27 +177,27 @@ transfer_experiments = [
         "target_env": simple_env_info,
         "source_model_paths": [
             {
-                "difficulty": "complex",
-                "path": str(Path("models") / "{experiment}_{model}_complex"),
+                "difficulty": "simple",
+                "path": str(Path("models") / "{experiment}_{model}_simple"),
             },
         ],
     },
-    {
-        "target_env": medium_env_info,
-        "source_model_paths": [
-            {
-                "difficulty": "complex",
-                "path": str(Path("models") / "{experiment}_{model}_complex"),
-            },
-        ],
-    },
-    {
-        "target_env": complex_env_info,
-        "source_model_paths": [
-            {
-                "difficulty": "complex",
-                "path": str(Path("models") / "{experiment}_{model}_complex"),
-            },
-        ],
-    },
+    # {
+        # "target_env": medium_env_info,
+        # "source_model_paths": [
+            # {
+                # "difficulty": "complex",
+                # "path": str(Path("models") / "{experiment}_{model}_complex"),
+            # },
+        # ],
+    # },
+    # {
+        # "target_env": complex_env_info,
+        # "source_model_paths": [
+            # {
+                # "difficulty": "complex",
+                # "path": str(Path("models") / "{experiment}_{model}_complex"),
+            # },
+        # ],
+    # },
 ]

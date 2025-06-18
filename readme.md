@@ -99,4 +99,9 @@ See requirements.txt. Key libraries include:
 - numpy
 
 ### 📬 Contact
-For questions, feel free to open an issue or email jehernandezr@udistrital.edu.co.
+For questions, feel free to open an issue or email jehernandezr@udistrital.edu.co
+
+
+# to do
+
+- save reward for base algs

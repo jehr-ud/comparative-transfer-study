@@ -44,6 +44,11 @@ class VisualMazeEnv(gym.Env):
         self.window = self.shared_window
         self.clock = None
 
+        self.last_pos = None
+        self.last_action = None
+        self.stuck_counter = 0
+        self.visited = np.zeros_like(self.maze, dtype=np.int32)
+
         if self.render_mode == "human":
             print("[DEBUG] Initializing Pygame window")
             self.clock = pygame.time.Clock()
@@ -57,7 +62,7 @@ class VisualMazeEnv(gym.Env):
         self.steps_taken = 0
         return np.array(self.agent_pos, dtype=np.float32), {}
 
-    def get_valid_actions(self, current_pos=None):
+    def get_possible_actions(self, current_pos=None):
         """
         Calcula y retorna una lista de acciones válidas 
         desde la posición actual del agente.
@@ -73,57 +78,59 @@ class VisualMazeEnv(gym.Env):
         moves = [(-1, 0), (0, 1), (1, 0), (0, -1)]
 
         for action, (dr, dc) in enumerate(moves):
-            new_row, new_col = row + dr, col + dc
+            new_row = int(row + dr)
+            new_col = int(col + dc)
             if 0 <= new_row < self.size and 0 <= new_col < self.size:
                 if self.maze[new_row, new_col] != 1:
                     valid_actions.append(action)
 
         return valid_actions
 
+    def valid_position(self, pos):
+        x, y = pos
+        return 0 <= x < self.size and 0 <= y < self.size
+
     def step(self, action):
         old_pos = tuple(self.agent_pos)
         new_pos = list(old_pos)
 
-        if action == 0:
+        if action == 0:       # Arriba
             new_pos[0] -= 1
-        elif action == 1:
-            new_pos[0] += 1
-        elif action == 2:
-            new_pos[1] -= 1
-        elif action == 3:
+        elif action == 1:     # Derecha
             new_pos[1] += 1
+        elif action == 2:     # Abajo
+            new_pos[0] += 1
+        elif action == 3:     # Izquierda
+            new_pos[1] -= 1
 
-        print(
-            f"[DEBUG] Agent at {old_pos}, action {action}, new_pos {new_pos}"
-        )
+        print(f"[DEBUG] Agent at {old_pos}, action {action}, new_pos {new_pos}")
 
         self.steps_taken += 1
-
-        reward = -0.01  # Penalización base por paso
-        moved = False
-
-        if 0 <= new_pos[0] < self.size and 0 <= new_pos[1] < self.size:
-            if self.maze[tuple(new_pos)] == 0:
-                self.agent_pos = new_pos
-                moved = True
-                reward += 0.02
-                print("[DEBUG] Moved to", self.agent_pos)
-            else:
-                print("[DEBUG] Hit obstacle at", new_pos)
-                reward = -0.2
-        else:
-            print("[DEBUG] Invalid move out of bounds to", new_pos)
-            reward = -0.5
-
-        if not moved and reward == -0.01:
-            reward -= 0.03  # Penalización por no hacer progreso
-
-        done = self.agent_pos == self.goal_pos
         timeout = False
 
+        # 1. Recompensa base por existir (costo de vida)
+        reward = -0.01
+
+        # 2. Penalización por chocar o salir del mapa
+        if not self.valid_position(new_pos):
+            reward = -1.0  # Penalización fuerte por salir
+        elif self.maze[tuple(new_pos)] == 1:
+            reward = -0.75  # Penalización fuerte por chocar
+        else:
+            # 3. Movimiento válido
+            self.agent_pos = new_pos
+            self.visited[tuple(self.agent_pos)] += 1
+
+            # 4. Recompensa por exploración (la más importante)
+            if self.visited[tuple(self.agent_pos)] == 1:
+                reward += 0.5  # Recompensa alta por descubrir una celda nueva
+            else:
+                # Penalización suave por visitar celdas ya conocidas
+                reward -= 0.05
+        # 5. Recompensa final por alcanzar la meta
+        done = self.agent_pos == self.goal_pos
         if done:
-            reward = 1.0
-            print("[DEBUG] Goal reached!")
+            reward = 10.0  # Recompensa muy alta por ganar
         elif self.steps_taken >= self.max_steps:
             timeout = True
 
@@ -132,13 +139,10 @@ class VisualMazeEnv(gym.Env):
             "timeout": timeout
         }
 
-        return (
-            np.array(self.agent_pos, dtype=np.float32),
-            reward,
-            done,
-            timeout,
-            info
-        )
+        obs = np.array(self.agent_pos, dtype=np.float32)
+        print(f"[DEBUG] obs {obs}")
+
+        return obs, reward, done, timeout, info
 
     def render(self):
         if self.render_mode == "human":

@@ -32,7 +32,7 @@ RESULTS_DIRS = {
 }
 
 PROGRESS_FILE = "progress.json"
-TOTAL_RUNS = 5
+TOTAL_RUNS = 1
 
 
 def clean_directories(type):
@@ -43,7 +43,7 @@ def clean_directories(type):
 
 
 def load_progress(choice):
-    file_name = PROGRESS_FILE.replace(".json", f"{choice}.json")
+    file_name = PROGRESS_FILE.replace(".json", f"_{choice}.json")
     if os.path.exists(file_name):
         with open(file_name, "r") as f:
             return json.load(f)
@@ -51,7 +51,7 @@ def load_progress(choice):
 
 
 def save_progress(choice, progress):
-    file_name = PROGRESS_FILE.replace(".json", f"{choice}.json")
+    file_name = PROGRESS_FILE.replace(".json", f"_{choice}.json")
     with open(file_name, "w") as f:
         json.dump(progress, f, indent=2)
 
@@ -79,11 +79,11 @@ def run_transfer_methods(experiment_number):
         "transfer",
         experiment_number
     )
-    run_transfer_comparation(
-        transfer_algorithms,
-        transfer_experiments,
-        experiment_number
-    )
+    # run_transfer_comparation(
+    #     transfer_algorithms,
+    #     transfer_experiments,
+    #     experiment_number
+    # )
 
 
 if __name__ == "__main__":

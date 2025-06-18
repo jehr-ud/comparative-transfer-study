@@ -2,20 +2,19 @@ from pathlib import Path
 from agents.cit_agent import CITgent
 from stages.utils import (
     load_progress,
-    get_max_iterations,
     save_progress
 )
 
 
 config = {
     "simple": {
-        "total_timesteps": 2_000,
+        "total_timesteps": 1000,
     },
     "medium": {
-        "total_timesteps": 4_000,
+        "total_timesteps": 2_000,
     },
     "complex": {
-        "total_timesteps": 6_000,
+        "total_timesteps": 3_000,
     }
 }
 
@@ -32,12 +31,7 @@ def train_agent(
     if params_train is None:
         params_train = {}
 
-    agent: CITgent = model_class(
-        model_name,
-        difficulty,
-        env_info,
-        save_path=save_path
-    )
+    agent = None
 
     rewards = []
     save_path = Path(save_path).resolve()
@@ -49,37 +43,46 @@ def train_agent(
     final_model_path.mkdir(parents=True, exist_ok=True)
 
     start_iteration = load_progress(model_name, difficulty, experiment_number)
-    max_iterations = get_max_iterations(difficulty)
 
     episode = start_iteration
+    episodes = config.get(difficulty).get('total_timesteps')
+    temporal = f"models/temporal/{experiment_number}"
+    temp_model_file = Path(f"{temporal}_{model_name}")
 
-    while episode < max_iterations:
-        episodes = config.get(difficulty).get('total_timesteps')
-        for episode_num in range(episodes):
-            reward = agent.train()
-            rewards.append(reward)
+    try:
+        agent: CITgent = model_class(
+            model_name,
+            difficulty,
+            env_info,
+            save_path=save_path
+        )
+    except Exception as e:
+        print(f"[FATAL ERROR] Could not create the agent: {e}")
+        return None, []
 
-            agent.save(str(temp_model_path))
-            save_progress(
-                episode + 1,
-                model_name,
-                difficulty,
-                experiment_number
-            )
+    if start_iteration > 0 and temp_model_file.exists():
+        print(f"[INFO] Loading model from: {temp_model_file}")
+        agent.load(str(temp_model_file))
 
-            if (episode_num + 1) % 5 == 0:
-                print(
-                    f"Episode {episode_num + 1}. Reward: {reward:.2f}"
-                )
-                print("Guardando checkpoint del modelo...")
-                temporal = f"models/temporal/{experiment_number}"
-                agent.save(
-                    f"{temporal}_checkpoint_{episode_num + 1}"
-                )
-                import time
-                time.sleep(5)
+    for episode_num in range(start_iteration, episodes):
+        reward = agent.train()
+        rewards.append(reward)
 
-            episode += 1
+        save_progress(
+            episode + 1,
+            model_name,
+            difficulty,
+            experiment_number
+        )
+
+        agent.save(
+            str(temp_model_file)
+        )
+
+        print(
+            f"Episode {episode_num + 1}. Reward: {reward}"
+        )
+        episode += 1
 
     if agent:
         try:
