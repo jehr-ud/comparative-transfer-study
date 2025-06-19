@@ -79,11 +79,11 @@ def run_transfer_methods(experiment_number):
         "transfer",
         experiment_number
     )
-    # run_transfer_comparation(
-    #     transfer_algorithms,
-    #     transfer_experiments,
-    #     experiment_number
-    # )
+    #run_transfer_comparation(
+    #    transfer_algorithms,
+    #    transfer_experiments,
+    #    experiment_number
+    #)
 
 
 if __name__ == "__main__":

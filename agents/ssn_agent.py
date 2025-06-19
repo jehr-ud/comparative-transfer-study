@@ -8,7 +8,7 @@ from spikingjelly.activation_based.learning import STDPLearner
 import random
 import os
 from pathlib import Path
-from collections import deque
+from collections import deque, defaultdict
 
 
 class GridCellSystem:
@@ -17,51 +17,48 @@ class GridCellSystem:
         self.width = width
         self.n_grids = n_grids
         self.device = device
-        self.num_neurons = height * width
+        
+        # Pre-calculamos los mapas de activación para acelerar el proceso
+        print("Pre-calculando mapas de activación de Grid Cells...")
+        self.activation_maps = self._precompute_maps()
+        print("Mapas de Grid Cells listos.")
 
-        self.scales = np.random.uniform(3, 10, n_grids)  # Diferentes escalas/espaciados
-        self.orientations = np.random.uniform(0, np.pi / 3, n_grids) # Diferentes orientaciones
-        self.phases = np.random.uniform(0, 2 * np.pi, (n_grids, 2)) # Desfases aleatorios
+    def _precompute_maps(self):
+        # Generamos los parámetros de las rejillas
+        scales = np.random.uniform(3, 10, self.n_grids)
+        orientations = np.random.uniform(0, np.pi / 3, self.n_grids)
+        phases = np.random.uniform(0, 2 * np.pi, (self.n_grids, 2))
+        
+        # Creamos un tensor para guardar todos los mapas de activación
+        num_neurons = self.height * self.width
+        maps = torch.zeros(self.height, self.width, self.n_grids)
+        
+        # Creamos una rejilla de coordenadas para todo el laberinto
+        y, x = np.meshgrid(np.arange(self.height), np.arange(self.width), indexing='ij')
+        pos_grid = np.stack([y.ravel(), x.ravel()], axis=1)
+
+        for k in range(self.n_grids):
+            rot_matrix = np.array([[np.cos(orientations[k]), -np.sin(orientations[k])],
+                                   [np.sin(orientations[k]), np.cos(orientations[k])]])
+            rotated_grid = (rot_matrix @ pos_grid.T).T
+            
+            term1 = np.cos(2 * np.pi * rotated_grid[:, 0] / scales[k] + phases[k, 0])
+            term2 = np.cos(2 * np.pi * (-0.5 * rotated_grid[:, 0] + np.sqrt(3)/2 * rotated_grid[:, 1]) / scales[k] + phases[k, 1])
+            term3 = np.cos(2 * np.pi * (-0.5 * rotated_grid[:, 0] - np.sqrt(3)/2 * rotated_grid[:, 1]) / scales[k] + phases[k, 0])
+            
+            activation = (term1 + term2 + term3).reshape(self.height, self.width)
+            maps[:, :, k] = torch.tensor(activation)
+            
+        return maps.to(self.device)
 
     def get_grid_cell_input(self, pos):
-        """
-        Calcula la corriente de entrada de las grid cells para una posición dada.
-        """
-        pos = np.array(pos)
-        total_grid_activation = torch.zeros(self.num_neurons, device=self.device)
-
-        # Se itera sobre todas las neuronas/posiciones del mapa
-        for i in range(self.height):
-            for j in range(self.width):
-                neuron_idx = i * self.width + j
-                neuron_pos = np.array([i, j])
-                activation = 0
-
-                # Sumamos la activación de cada una de las rejillas
-                for k in range(self.n_grids):
-                    # Rotamos las coordenadas según la orientación de la rejilla
-                    rot_matrix = np.array([[np.cos(self.orientations[k]), -np.sin(self.orientations[k])],
-                                           [np.sin(self.orientations[k]), np.cos(self.orientations[k])]])
-                    rotated_pos = rot_matrix @ neuron_pos
-
-                    # Usamos una función de onda cosenoidal para simular el patrón hexagonal
-                    # (Esta es una aproximación matemática estándar)
-                    term1 = np.cos(2 * np.pi * rotated_pos[0] / self.scales[k] + self.phases[k, 0])
-                    term2 = np.cos(2 * np.pi * (-0.5 * rotated_pos[0] + np.sqrt(3)/2 * rotated_pos[1]) / self.scales[k] + self.phases[k, 1])
-                    term3 = np.cos(2 * np.pi * (-0.5 * rotated_pos[0] - np.sqrt(3)/2 * rotated_pos[1]) / self.scales[k] + self.phases[k, 0])
-
-                    # La activación es alta si la posición está en un "hotspot" de la rejilla
-                    activation += (term1 + term2 + term3)
-
-                # Solo consideramos activaciones positivas y las normalizamos
-                total_grid_activation[neuron_idx] = max(0, activation)
-
-        # Si una neurona corresponde a la posición actual del agente, su activación se suprime
-        # para dar prioridad a la 'place cell'.
-        current_idx = int(pos[0]) * self.width + int(pos[1])
-        total_grid_activation[current_idx] = 0
-
-        return total_grid_activation / self.n_grids
+        # Ahora es una búsqueda súper rápida en el mapa pre-calculado
+        y, x = int(pos[0]), int(pos[1])
+        # Sumamos las activaciones de todas las rejillas para la posición (y, x)
+        total_grid_activation = torch.sum(self.activation_maps[y, x, :])
+        
+        # Solo consideramos activaciones positivas y normalizamos
+        return max(0, total_grid_activation.item()) / self.n_grids
 
 
 class SNNCITgent:
@@ -109,9 +106,59 @@ class SNNCITgent:
             self.maze_width,
             device=self.device
         )
+        
+        self.reward_bonus = 0.05 # Hiperparámetro para el refuerzo
+        self.familiarity = defaultdict(int)
 
     def _pos_to_idx(self, pos):
         return int(pos[0]) * self.maze_width + int(pos[1])
+
+    def _idx_to_pos(self, idx):
+        """Convierte un índice de neurona a coordenadas (fila, col)."""
+        # Usamos división entera para encontrar la fila
+        row = idx // self.maze_width
+        # Usamos el módulo para encontrar la columna
+        col = idx % self.maze_width
+        return (row, col)
+
+    def explore(self, position, epsilon=0.1, prev_pos=None):
+        valid_actions = self.env.get_possible_actions(position)
+        if not valid_actions:
+            return random.randint(0, 3)
+
+        if random.random() < epsilon:
+            return random.choice(valid_actions)
+
+        scored_moves = []
+        action_deltas = {0: (-1, 0), 1: (0, 1), 2: (1, 0), 3: (0, -1)}
+        for action in valid_actions:
+            dy, dx = action_deltas[action]
+            neighbor = (position[0] + dy, position[1] + dx)
+
+            if neighbor == prev_pos:
+                novelty_score = -1.0
+            else:
+                novelty_score = 1 / (1 + self.familiarity.get(neighbor, 0) ** 2)
+            scored_moves.append((novelty_score, action))
+
+        scored_moves.sort(key=lambda x: x[0], reverse=True)
+        return scored_moves[0][1]
+
+    def reward_boost_path(self, path):
+        """Refuerza las conexiones sinápticas a lo largo de un camino exitoso."""
+        print(f"Reforzando sinapsis del camino exitoso (longitud {len(path)})...")
+        with torch.no_grad():
+            for i in range(len(path) - 1):
+                pos_a = path[i]
+                pos_b = path[i+1]
+
+                idx_a = self._pos_to_idx(pos_a)
+                idx_b = self._pos_to_idx(pos_b)
+
+                # Reforzamos la conexión A -> B
+                current_weight = self.synaptic_layer.weight.data[idx_b, idx_a]
+                # Usamos clamp para no superar el máximo (asumimos 1.0)
+                self.synaptic_layer.weight.data[idx_b, idx_a] = torch.clamp(current_weight + self.reward_bonus, max=1.0)
 
     def consolidate(self, path, total_reward):
         """Consolida una ruta aprendida si fue eficiente."""
@@ -227,6 +274,10 @@ class SNNCITgent:
             truncated = False
 
             while not (terminated or truncated):
+                grid_input_val = self.grid_cell_system.get_grid_cell_input(self.last_position)
+
+                self.familiarity[self.last_position] += 1
+
                 # --- La simulación SNN no cambia ---
                 current_idx = self._pos_to_idx(self.last_position)
                 num_neurons = self.maze_height * self.maze_width
@@ -235,6 +286,7 @@ class SNNCITgent:
                     device=self.device
                 )
                 input_current_per_step[current_idx] = self.input_current
+                input_current_per_step += grid_input_val # Añadimos input de grid cells
                 self.place_cells.reset()
                 self.stdp_learner.reset()
                 previous_step_spikes = torch.zeros(
@@ -249,15 +301,11 @@ class SNNCITgent:
                     self.stdp_learner.step()
                     previous_step_spikes = current_step_spikes
 
-                # --- La selección de acción inteligente (Epsilon-Greedy) no cambia ---
-                valid_actions = self.env.get_possible_actions(self.last_position)
-                if not valid_actions:
-                    valid_actions = list(range(4))
-
-                if random.random() < epsilon:
-                    action = random.choice(valid_actions)
-                else:
-                    action = self.predict_snn_action(self.last_position, valid_actions)
+                action = self.explore(
+                    self.last_position,
+                    epsilon,
+                    prev_pos=self.previous_position
+                )
 
                 # --- Interacción con el entorno ---
                 next_obs, reward, terminated, truncated, _ = self.env.step(action)
@@ -272,6 +320,7 @@ class SNNCITgent:
             if terminated:
                 print(f"[OK] Meta alcanzada. Reward: {total_reward}. Pasos: {len(path) - 1}")
                 self.consolidate(path, total_reward)
+                self.reward_boost_path(path)
             else:
                 print(f"[FAIL] No alcanzó la meta. Reward: {total_reward}")
 

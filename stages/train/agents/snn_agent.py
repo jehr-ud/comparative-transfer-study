@@ -8,13 +8,13 @@ from stages.utils import (
 
 config = {
     "simple": {
-        "total_timesteps": 200,
+        "total_timesteps": 500,
     },
     "medium": {
-        "total_timesteps": 2_000,
+        "total_timesteps": 1000,
     },
     "complex": {
-        "total_timesteps": 3_000,
+        "total_timesteps": 1500,
     }
 }
 
@@ -71,7 +71,7 @@ def train_agent(
 
     for episode_num in range(start_iteration, episodes):
         current_epsilon = max(min_epsilon, initial_epsilon * (epsilon_decay_rate ** episode_num))
-        
+
         reward = agent.train(epsilon=current_epsilon)
         rewards.append(reward)
 
