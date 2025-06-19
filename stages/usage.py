@@ -99,7 +99,7 @@ def show_agent(algoritmhs, difficulty, envs):
         print(f"Loading {model_path}")
         agent = load_model(
                 model_name,
-                model_path,
+                Path(model_path),
                 algoritmh.get('class'),
                 difficulty,
                 env

@@ -12,6 +12,8 @@ seaborn
 spikingjelly
 pyarrow
 torch
+torchvision
+tensorboard
 transformers
 d3rlpy
 ray[rllib]

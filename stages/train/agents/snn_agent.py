@@ -1,5 +1,5 @@
 from pathlib import Path
-from agents.cit_agent import CITgent
+from agents.ssn_agent import SNNCITgent
 from stages.utils import (
     load_progress,
     save_progress
@@ -20,7 +20,7 @@ config = {
 
 
 def train_agent(
-    model_class: CITgent,
+    model_class: SNNCITgent,
     model_name,
     env_info,
     difficulty,
@@ -35,12 +35,12 @@ def train_agent(
 
     rewards = []
     save_path = Path(save_path).resolve()
-    path = f"{experiment_number}_{model_name}_{difficulty}"
-    final_model_path = save_path / path
-    temp_model_path = save_path / "temporal" / path
+    path_suffix = f"{experiment_number}_{model_name}_{difficulty}"
+    final_model_dir = save_path / path_suffix
+    temp_model_dir = save_path / "temporal" / path_suffix
 
-    temp_model_path.mkdir(parents=True, exist_ok=True)
-    final_model_path.mkdir(parents=True, exist_ok=True)
+    temp_model_dir.mkdir(parents=True, exist_ok=True)
+    final_model_dir.mkdir(parents=True, exist_ok=True)
 
     start_iteration = load_progress(model_name, difficulty, experiment_number)
 
@@ -50,7 +50,7 @@ def train_agent(
     temp_model_file = Path(f"{temporal}_{model_name}")
 
     try:
-        agent: CITgent = model_class(
+        agent: SNNCITgent = model_class(
             model_name,
             difficulty,
             env_info,
@@ -71,8 +71,8 @@ def train_agent(
 
     for episode_num in range(start_iteration, episodes):
         current_epsilon = max(min_epsilon, initial_epsilon * (epsilon_decay_rate ** episode_num))
+        
         reward = agent.train(epsilon=current_epsilon)
-
         rewards.append(reward)
 
         save_progress(
@@ -93,7 +93,7 @@ def train_agent(
 
     if agent:
         try:
-            agent.save(str(final_model_path))
+            agent.save(save_dir=final_model_dir)
         except Exception as save_e:
             print(f"[❌] Error saving final model: {save_e}")
 

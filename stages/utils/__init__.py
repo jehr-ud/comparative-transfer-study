@@ -29,12 +29,12 @@ def load_model(
         model.load(model_path)
         return model
 
-    base_path = f"{model_name}_{difficulty}"
-    load_to = Path(model_path) if model_path else model_path / base_path
-    load_to = load_to.resolve()
+    #base_path = f"{model_name}_{difficulty}"
+    #load_to = Path(model_path) if model_path else model_path / base_path
+    #load_to = load_to.resolve()
 
     model = model_class(model_name, difficulty, env_info)
-    model.load(str(load_to))
+    model.load(model_path)
     return model
 
 

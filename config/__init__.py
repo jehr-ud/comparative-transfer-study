@@ -9,9 +9,11 @@ from agents.base_agent import (
 from agents.q_learning import QLearning
 from agents.imitation_agent import ImitationMarWilTransfer
 from agents.cit_agent import CITgent
+from agents.ssn_agent import SNNCITgent
 
 from stages.train.agents.base_classical_agent import train_basical_agent
 from stages.train.agents.cit_agent import train_agent
+from stages.train.agents.snn_agent import train_agent as snn_train_agent
 from stages.train.agents.imitation_transfer import (
     train_imitation_transfer_agent
 )
@@ -133,9 +135,9 @@ marwil = {
 
 # Perception-Action Agent
 cpa = {
-    "name": "CIT",
-    "class": CITgent,
-    "train_function": train_agent,
+    "name": "CIT-SSN",
+    "class": SNNCITgent,
+    "train_function": snn_train_agent,
     "params_predict": {},
     "params_train": {
     },
