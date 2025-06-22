@@ -21,43 +21,6 @@ def get_sb_model_params(model_name, difficulty):
             "complex": {
                 "total_timesteps": 	231_000,
             }
-        },
-        "PPO": {
-            "simple": {
-                "total_timesteps": 500,
-                # "learning_rate": 1e-3,
-                # "n_steps": 256,
-                # "batch_size": 64
-            },
-            "medium": {
-                "total_timesteps": 750,
-                # "learning_rate": 2e-3,
-                # "n_steps": 1024,
-                # "batch_size": 64
-            },
-            "complex": {
-                "total_timesteps": 1000,
-                # "learning_rate": 2.8e-3,
-                # "n_steps": 2048,
-                # "batch_size": 128
-            }
-        },
-        "A2C": {
-            "simple": {
-                "total_timesteps": 500_000,
-                "learning_rate": 1e-3,
-                "n_steps": 20
-            },
-            "medium": {
-                "total_timesteps": 750_000,
-                "learning_rate": 2e-3,
-                "n_steps": 40
-            },
-            "complex": {
-                "total_timesteps": 1_000_000,
-                "learning_rate": 2.8e-3,
-                "n_steps": 80
-            }
         }
     }
 
@@ -121,7 +84,7 @@ def train_basical_agent(
     try:
         print(f"--- Starting Iteration {i}/{max_iterations-1} ---")
         target_episodes = get_episode_targets(difficulty)
-        
+
         rewards = agent.train(target_episodes=target_episodes, max_timesteps=total_timesteps_per_iteration)
 
         save_progress(i + 1, model_name, difficulty, experiment_number)

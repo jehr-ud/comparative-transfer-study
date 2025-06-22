@@ -1,6 +1,6 @@
 # 🧠 Visual Maze Reinforcement Learning Project
 
-This project implements training, evaluation, and Imitation transfer learning using popular RL algorithms (Q-Learning, DQN, PPO, A2C) in a custom visual maze environment.
+This project implements training, evaluation, for RL algorithms (DQN and CIT-SNN) in a custom visual maze environment.
 
 
 ---
@@ -12,11 +12,10 @@ This project implements training, evaluation, and Imitation transfer learning us
 │
 ├── environments/
 │ └── init.py
-│ └── visual_maze.py # Custom maze environment definition
-│ └── create_env.py # Factory function to create environments of different difficulty
+│ └── visual_maze_env.py # Custom maze environment definition
 │
 ├── stages/
-│ ├── evaluation.py # Evaluation and transfer learning functions
+│ ├── evaluation.py # Evaluation functions
 │ ├── comparation.py # Generate the comparation 
 │ │── train/ # functions to train agents
 │
@@ -84,9 +83,7 @@ In models/
 ## 🤖 Algorithms Used
 
 - DQN
-- PPO
-- A2C
-- QLearning
+- CIT-SNN
 
 
 ## 📚 Requirements
@@ -100,8 +97,3 @@ See requirements.txt. Key libraries include:
 
 ### 📬 Contact
 For questions, feel free to open an issue or email jehernandezr@udistrital.edu.co
-
-
-# to do
-
-- save reward for base algs

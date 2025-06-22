@@ -17,7 +17,7 @@ class GridCellSystem:
         self.width = width
         self.n_grids = n_grids
         self.device = device
-        
+
         # Pre-calculamos los mapas de activación para acelerar el proceso
         print("Pre-calculando mapas de activación de Grid Cells...")
         self.activation_maps = self._precompute_maps()
@@ -28,10 +28,10 @@ class GridCellSystem:
         scales = np.random.uniform(3, 10, self.n_grids)
         orientations = np.random.uniform(0, np.pi / 3, self.n_grids)
         phases = np.random.uniform(0, 2 * np.pi, (self.n_grids, 2))
-        
+
         # Creamos un tensor para guardar todos los mapas de activación
         maps = torch.zeros(self.height, self.width, self.n_grids)
-        
+
         # Creamos una rejilla de coordenadas para todo el laberinto
         y, x = np.meshgrid(np.arange(self.height), np.arange(self.width), indexing='ij')
         pos_grid = np.stack([y.ravel(), x.ravel()], axis=1)
@@ -40,14 +40,14 @@ class GridCellSystem:
             rot_matrix = np.array([[np.cos(orientations[k]), -np.sin(orientations[k])],
                                    [np.sin(orientations[k]), np.cos(orientations[k])]])
             rotated_grid = (rot_matrix @ pos_grid.T).T
-            
+
             term1 = np.cos(2 * np.pi * rotated_grid[:, 0] / scales[k] + phases[k, 0])
             term2 = np.cos(2 * np.pi * (-0.5 * rotated_grid[:, 0] + np.sqrt(3)/2 * rotated_grid[:, 1]) / scales[k] + phases[k, 1])
             term3 = np.cos(2 * np.pi * (-0.5 * rotated_grid[:, 0] - np.sqrt(3)/2 * rotated_grid[:, 1]) / scales[k] + phases[k, 0])
-            
+
             activation = (term1 + term2 + term3).reshape(self.height, self.width)
             maps[:, :, k] = torch.tensor(activation)
-            
+
         return maps.to(self.device)
 
     def get_grid_cell_input(self, pos):
@@ -55,7 +55,7 @@ class GridCellSystem:
         y, x = int(pos[0]), int(pos[1])
         # Sumamos las activaciones de todas las rejillas para la posición (y, x)
         total_grid_activation = torch.sum(self.activation_maps[y, x, :])
-        
+
         # Solo consideramos activaciones positivas y normalizamos
         return max(0, total_grid_activation.item()) / self.n_grids
 
@@ -105,7 +105,7 @@ class SNNCITgent:
             self.maze_width,
             device=self.device
         )
-        
+
         self.reward_bonus = 0.05 # Hiperparámetro para el refuerzo
         self.familiarity = defaultdict(int)
 
@@ -113,10 +113,10 @@ class SNNCITgent:
         return int(pos[0]) * self.maze_width + int(pos[1])
 
     def _idx_to_pos(self, idx):
-        """Convierte un índice de neurona a coordenadas (fila, col)."""
-        # Usamos división entera para encontrar la fila
+        """Converts a neuron index to (row, col) coordinates."""
+        # We use integer division to find the row
         row = idx // self.maze_width
-        # Usamos el módulo para encontrar la columna
+        # We use the module to find the column
         col = idx % self.maze_width
         return (row, col)
 
@@ -144,7 +144,7 @@ class SNNCITgent:
         return scored_moves[0][1]
 
     def reward_boost_path(self, path):
-        """Refuerza las conexiones sinápticas a lo largo de un camino exitoso."""
+        """Strengthens synaptic connections along a successful path."""
         print(f"Reforzando sinapsis del camino exitoso (longitud {len(path)})...")
         with torch.no_grad():
             for i in range(len(path) - 1):
@@ -160,7 +160,7 @@ class SNNCITgent:
                 self.synaptic_layer.weight.data[idx_b, idx_a] = torch.clamp(current_weight + self.reward_bonus, max=1.0)
 
     def consolidate(self, path, total_reward):
-        """Consolida una ruta aprendida si fue eficiente."""
+        """Consolidate a learned route if it was efficient."""
         if not path or len(path) <= 1:
             return
 
@@ -178,8 +178,8 @@ class SNNCITgent:
     @torch.no_grad()
     def predict_snn_action(self, current_pos, valid_actions, prev_pos=None):
         """
-        Usa el mapa sináptico aprendido para decidir la mejor acción a tomar,
-        evitando devolverse a la posición anterior.
+        Use the learned semantic map to decide the best action to take,
+        avoiding returning to the previous position.
         """
         num_neurons = self.maze_height * self.maze_width
         current_idx = self._pos_to_idx(current_pos)
@@ -201,7 +201,7 @@ class SNNCITgent:
             dy, dx = action_deltas[action]
             neighbor_pos = (current_pos[0] + dy, current_pos[1] + dx)
 
-            # <<<< LÓGICA ANTI-PING-PONG INTEGRADA >>>>
+            # <<<< INTEGRATED ANTI-PING-PONG LOGIC >>>>
             if neighbor_pos == prev_pos:
                 activation_score = -float('inf')  # Se devuelve
             else:
@@ -219,8 +219,8 @@ class SNNCITgent:
 
     def plan_path_snn(self, start_pos, goal_pos, weight_threshold=0.1):
         """
-        Usa Búsqueda en Anchura (BFS) sobre el mapa sináptico aprendido para
-        encontrar un camino desde el inicio hasta el objetivo.
+        Use Breadth-First Search (BFS) on the learned semantic map to
+        find a path from the start to the goal.
         """
         print(f"Planificando ruta desde {start_pos} hasta {goal_pos}...")
 
@@ -244,10 +244,10 @@ class SNNCITgent:
                 print(f"¡Ruta encontrada! Longitud: {len(path_pos)}")
                 return path_pos
 
-            # Encontrar vecinos: son las neuronas 'j' a las que la neurona 'current_idx'
-            # tiene una conexión fuerte.
-            # En nuestra matriz de peso W[i, j], 'j' es pre-sináptica (desde) e 'i' es post-sináptica (hacia).
-            # La conexión desde 'current_idx' hacia 'neighbor_idx' está en W[neighbor_idx, current_idx].
+            # Find neighbors: These are the neurons 'j' to which the neuron 'current_idx'
+            # has a strong connection.
+            # In our weight matrix W[i, j], 'j' is pre-synaptic (from) and 'i' is post-synaptic (to).
+            # The connection from 'current_idx' to 'neighbor_idx' is in W[neighbor_idx, current_idx].
             neighbors = torch.where(adj_matrix[:, current_idx])[0]
 
             for neighbor_idx in neighbors:
@@ -258,7 +258,7 @@ class SNNCITgent:
                     queue.append((neighbor_idx, new_path))
 
         print("No se pudo encontrar una ruta al objetivo.")
-        return None  # no se encuentra camino
+        return None  # no path found
 
     def train(self, epsilon=0.1):
         with torch.no_grad():
@@ -305,7 +305,7 @@ class SNNCITgent:
                     prev_pos=self.previous_position
                 )
 
-                # --- Interacción con el entorno ---
+                # --- Interaction with the environment ---
                 next_obs, reward, terminated, truncated, _ = self.env.step(action)
                 next_pos = tuple(next_obs)
 
@@ -327,16 +327,16 @@ class SNNCITgent:
 
     def predict(self, obs):
         """
-        Toma una acción usando una jerarquía:
-        1. Sigue un plan a largo plazo si existe y es válido.
-        2. Si no, crea un nuevo plan hacia el objetivo.
-        3. Si no puede planificar, recurre a la decisión local paso a paso.
+        Take action using a hierarchy:
+        1. Follow a long-term plan if one exists and is valid.
+        2. If not, create a new plan toward the goal.
+        3. If you can't plan, resort to local, step-by-step decision-making.
         """
         current_pos = tuple(obs)
         valid_actions = self.env.get_possible_actions(current_pos)
 
-        # --- ESTRATEGIA 1: Seguir el plan existente ---
-        # Si ya tenemos un plan y todavía estamos en él, lo seguimos.
+        # --- STRATEGY 1: Stick to the existing plan ---
+        # If we already have a plan and are still working on it, we stick to it.
         if self.current_plan and current_pos in self.current_plan:
             idx = self.current_plan.index(current_pos)
             if idx + 1 < len(self.current_plan):
@@ -347,11 +347,11 @@ class SNNCITgent:
                     self.previous_position = current_pos
                     return action
 
-        # --- ESTRATEGIA 2: Crear un nuevo plan ---
-        # Si no hay plan, o nos hemos desviado, creamos uno nuevo.
+        # --- STRATEGY 2: Create a new plan ---
+        # If there is no plan, or we have deviated, we create a new one.
         self.current_plan = self.plan_path_snn(current_pos, self.goal)
 
-        # Si se encontró un plan, intentamos seguirlo inmediatamente
+        # If a plan was found, we tried to follow it immediately
         if self.current_plan and len(self.current_plan) > 1:
             next_pos = self.current_plan[1] # El siguiente paso después del actual
             action = self.direction_from_to(current_pos, next_pos)
