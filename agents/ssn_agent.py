@@ -30,7 +30,6 @@ class GridCellSystem:
         phases = np.random.uniform(0, 2 * np.pi, (self.n_grids, 2))
         
         # Creamos un tensor para guardar todos los mapas de activación
-        num_neurons = self.height * self.width
         maps = torch.zeros(self.height, self.width, self.n_grids)
         
         # Creamos una rejilla de coordenadas para todo el laberinto
@@ -278,7 +277,6 @@ class SNNCITgent:
 
                 self.familiarity[self.last_position] += 1
 
-                # --- La simulación SNN no cambia ---
                 current_idx = self._pos_to_idx(self.last_position)
                 num_neurons = self.maze_height * self.maze_width
                 input_current_per_step = torch.zeros(
@@ -286,7 +284,7 @@ class SNNCITgent:
                     device=self.device
                 )
                 input_current_per_step[current_idx] = self.input_current
-                input_current_per_step += grid_input_val # Añadimos input de grid cells
+                input_current_per_step += grid_input_val
                 self.place_cells.reset()
                 self.stdp_learner.reset()
                 previous_step_spikes = torch.zeros(

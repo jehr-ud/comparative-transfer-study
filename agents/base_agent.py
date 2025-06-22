@@ -7,35 +7,56 @@ from stable_baselines3.common.callbacks import BaseCallback
 import numpy as np
 
 
-class RewardCallback(BaseCallback):
+class EpisodeInfoCallback(BaseCallback):
     """
-    A custom callback that derives from ``BaseCallback``.
+    Una devolución de llamada personalizada para:
+    1. Registrar la recompensa total de cada episodio.
+    2. Detener el entrenamiento después de N episodios.
+    3. Opcionalmente, imprimir información de cada episodio en la consola.
 
-    :param verbose: Verbosity level: 0 for no output, 1 for info messages.
+    :param n_episodes: El número de episodios en los que entrenar.
+    :param log_to_console: Si es True, imprime la información del episodio.
+    :param verbose: Nivel de verbosidad.
     """
-    def __init__(self, verbose=0):
-        super(RewardCallback, self).__init__(verbose)
-        self.rewards = []
+    def __init__(self, n_episodes: int, log_to_console: bool = True, verbose: int = 0):
+        super(EpisodeInfoCallback, self).__init__(verbose)
+        self.n_episodes = n_episodes
+        self.log_to_console = log_to_console
+        
+        # Contadores y almacenamiento
+        self.episodes_done = 0
+        self.episode_rewards = []
+        self.episode_lengths = []
 
     def _on_step(self) -> bool:
         """
-        This method will be called by the model after each call to ``env.step()``.
-
-        For child callback (of an ``EventCallback``), this will be called
-        when the event is triggered.
-
-        :return: (bool) If the callback returns False, training is aborted early.
+        Este método es llamado en cada paso del entorno.
         """
+        # Itera sobre los 'dones' para manejar entornos vectorizados
         for i, done in enumerate(self.locals['dones']):
             if done:
-                # The 'infos' dictionary contains the episode reward and length
-                episode_reward = self.locals['infos'][i]['episode']['r']
-                self.rewards.append(episode_reward)
-                if self.verbose > 0:
-                    print(
-                        f"Episode finished. Reward: {episode_reward:.2f}, Total episodes: {len(self.rewards)}"
-                    )
-        return True
+                self.episodes_done += 1
+                
+                # Accede a la información del episodio desde el diccionario 'info'
+                info = self.locals['infos'][i]
+                
+                if 'episode' in info:
+                    reward = info['episode']['r']
+                    length = info['episode']['l']
+                    
+                    self.episode_rewards.append(reward)
+                    self.episode_lengths.append(length)
+                    
+                    if self.log_to_console:
+                        print(f"Episodio {self.episodes_done} terminado. Recompensa: {reward:.2f}, Longitud: {length}")
+
+        # Comprueba si se debe detener el entrenamiento
+        if self.episodes_done >= self.n_episodes:
+            if self.verbose > 0:
+                print(f"Deteniendo el entrenamiento: se alcanzaron los {self.n_episodes} episodios.")
+            return False  # Detiene el entrenamiento
+
+        return True # Continúa el entrenamiento
 
 
 class ClassicalAgent:
@@ -78,22 +99,24 @@ class ClassicalAgent:
         self.model = self.algorithm_class(
             "MlpPolicy",
             self.env_info.get('env'),
-            verbose=1,
+            verbose=0,
             **self.params
         )
 
-    def train(self, total_timesteps):
+    def train(self, target_episodes: int, max_timesteps: int):
         if self.model is None:
             raise ValueError("Model is not set up. Call setup_model() or load() first.")
-        reward_callback = RewardCallback(verbose=1)
 
+        # 1. El callback se crea con el número correcto de episodios objetivo.
+        episode_callback = EpisodeInfoCallback(n_episodes=target_episodes, log_to_console=True, verbose=1)
+
+        print(f"\nIniciando entrenamiento para {target_episodes} episodios (límite de {max_timesteps} timesteps)...")
         self.model.learn(
-            total_timesteps=total_timesteps,
-            callback=reward_callback,
-            reset_num_timesteps=False
+            total_timesteps=max_timesteps,
+            callback=episode_callback
         )
-        rewards = reward_callback.rewards if reward_callback.rewards else []
 
+        rewards = episode_callback.episode_rewards if episode_callback.episode_rewards else []
         return rewards
 
     def predict(self, obs):

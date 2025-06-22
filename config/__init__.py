@@ -75,8 +75,8 @@ complex_env_info = {
 
 envs = [
     simple_env_info,
-    # medium_env_info,
-    # complex_env_info
+    medium_env_info,
+    complex_env_info
 ]
 
 ppo = {
@@ -112,10 +112,10 @@ a2c = {
 }
 
 classical_algorithms = [
-    ppo,
+    #ppo,
     dqn,
-    qlearning,
-    a2c
+    #qlearning,
+    #a2c
 ]
 
 

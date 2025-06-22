@@ -32,7 +32,7 @@ RESULTS_DIRS = {
 }
 
 PROGRESS_FILE = "progress.json"
-TOTAL_RUNS = 1
+TOTAL_RUNS = 5
 
 
 def clean_directories(type):
@@ -62,11 +62,6 @@ def run_classical_methods(experiment_number):
         envs,
         classical_algorithms,
         "classical",
-        experiment_number
-    )
-    run_transfer_comparation(
-        classical_algorithms,
-        classical_transfer_experiments,
         experiment_number
     )
 

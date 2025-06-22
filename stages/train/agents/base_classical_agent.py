@@ -13,42 +13,33 @@ def get_sb_model_params(model_name, difficulty):
     configs = {
         "DQN": {
             "simple": {
-                "total_timesteps": 500_000,
-                "learning_rate": 1e-3,
-                "buffer_size": 20_000,
-                "batch_size": 64
+                "total_timesteps": 63_000,
             },
             "medium": {
-                "total_timesteps": 750_000,
-                "learning_rate": 2e-3,
-                "buffer_size": 50_000,
-                "batch_size": 64
+                "total_timesteps": 108_000,
             },
             "complex": {
-                "total_timesteps": 1_000_000,
-                "learning_rate": 2.8e-3,
-                "buffer_size": 100_000,
-                "batch_size": 128
+                "total_timesteps": 	231_000,
             }
         },
         "PPO": {
             "simple": {
-                "total_timesteps": 500_000,
-                "learning_rate": 1e-3,
-                "n_steps": 256,
-                "batch_size": 64
+                "total_timesteps": 500,
+                # "learning_rate": 1e-3,
+                # "n_steps": 256,
+                # "batch_size": 64
             },
             "medium": {
-                "total_timesteps": 750_000,
-                "learning_rate": 2e-3,
-                "n_steps": 1024,
-                "batch_size": 64
+                "total_timesteps": 750,
+                # "learning_rate": 2e-3,
+                # "n_steps": 1024,
+                # "batch_size": 64
             },
             "complex": {
-                "total_timesteps": 1_000_000,
-                "learning_rate": 2.8e-3,
-                "n_steps": 2048,
-                "batch_size": 128
+                "total_timesteps": 1000,
+                # "learning_rate": 2.8e-3,
+                # "n_steps": 2048,
+                # "batch_size": 128
             }
         },
         "A2C": {
@@ -71,6 +62,18 @@ def get_sb_model_params(model_name, difficulty):
     }
 
     return configs[model_name][difficulty]
+
+
+def get_episode_targets(difficulty: str) -> int:
+    """Devuelve el número de episodios objetivo según la dificultad."""
+    targets = {
+        "simple": 500,
+        "medium": 1000,
+        "complex": 1500,
+    }
+    if difficulty not in targets:
+        raise ValueError(f"Dificultad '{difficulty}' no reconocida. Opciones: {list(targets.keys())}")
+    return targets[difficulty]
 
 
 def train_basical_agent(
@@ -115,19 +118,19 @@ def train_basical_agent(
         return None, []
 
     i = start_iteration
-    while i < max_iterations:
-        try:
-            print(f"--- Starting Iteration {i}/{max_iterations-1} ---")
-            rewards = agent.train(total_timesteps_per_iteration)
+    try:
+        print(f"--- Starting Iteration {i}/{max_iterations-1} ---")
+        target_episodes = get_episode_targets(difficulty)
+        
+        rewards = agent.train(target_episodes=target_episodes, max_timesteps=total_timesteps_per_iteration)
 
-            agent.save(str(temp_model_file))
-            save_progress(i + 1, model_name, difficulty, experiment_number)
+        save_progress(i + 1, model_name, difficulty, experiment_number)
 
-            i += 1
+        i += 1
 
-        except Exception as e:
-            print(f"[ERROR] Iteration {i} failed: {e}. Retrying in 10 seconds...")
-            time.sleep(10)
+    except Exception as e:
+        print(f"[ERROR] Iteration {i} failed: {e}. Retrying in 10 seconds...")
+        time.sleep(10)
 
     try:
         print("Training complete. Saving final model...")
