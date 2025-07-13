@@ -1,5 +1,5 @@
 from pathlib import Path
-from agents.ssn_agent import SNNCITgent
+from agents.snncit_agent import SNNCITgent
 from stages.utils import (
     load_progress,
     save_progress

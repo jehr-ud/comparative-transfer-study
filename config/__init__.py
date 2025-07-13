@@ -6,20 +6,12 @@ from agents.base_agent import (
     ClassicalAgent as A2C,
     ClassicalAgent as DQN
 )
-from agents.q_learning import QLearning
-from agents.imitation_agent import ImitationMarWilTransfer
-from agents.cit_agent import CITgent
-from agents.ssn_agent import SNNCITgent
+from agents.snncit_agent import SNNCITgent
+from agents.adapsnn_agent import PrefrontalCortex as MazeSolver
 
 from stages.train.agents.base_classical_agent import train_basical_agent
-from stages.train.agents.cit_agent import train_agent
-from stages.train.agents.snn_agent import train_agent as snn_train_agent
-from stages.train.agents.imitation_transfer import (
-    train_imitation_transfer_agent
-)
-from stages.train.agents.base_q_learning_agent import (
-    train_q_learning_agent
-)
+from stages.train.agents.snncit_agent import train_agent as citsnn_train_agent
+from stages.train.agents.adapsnn_agent import train_agent as adapsnn_train_agent
 from environments.visual_maze_env import VisualMazeEnv
 
 
@@ -87,13 +79,6 @@ ppo = {
     "type": "classical",
 }
 
-qlearning = {
-    "name": "QLearning",
-    "class": QLearning,
-    "train_function": train_q_learning_agent,
-    "params_predict": {"deterministic": True},
-    "type": "classical",
-}
 
 dqn = {
     "name": "DQN",
@@ -112,32 +97,41 @@ a2c = {
 }
 
 classical_algorithms = [
-    #ppo,
+    ppo,
     dqn,
-    #qlearning,
-    #a2c
+    a2c
 ]
 
 
-marwil = {
-    "name": "Imitation-MarWil",
-    "class": ImitationMarWilTransfer,
-    "train_function": train_imitation_transfer_agent,
+#marwil = {
+#    "name": "Imitation-MarWil",
+#    "class": ImitationMarWilTransfer,
+#    "train_function": train_imitation_transfer_agent,
+#    "params_predict": {},
+#    "params_train": {
+#        "expert": {
+#            "expert_info": ppo,
+#            "path": str(Path("models") / "{model}_{env}")
+#        },
+#    },
+#    "type": "transfer",
+#}
+
+# Perception-Action Agent
+cit = {
+    "name": "CIT-SSN",
+    "class": SNNCITgent,
+    "train_function": citsnn_train_agent,
     "params_predict": {},
     "params_train": {
-        "expert": {
-            "expert_info": ppo,
-            "path": str(Path("models") / "{model}_{env}")
-        },
     },
     "type": "transfer",
 }
 
-# Perception-Action Agent
-cpa = {
-    "name": "CIT-SSN",
-    "class": SNNCITgent,
-    "train_function": snn_train_agent,
+adap = {
+    "name": "ADAP-SSN",
+    "class": MazeSolver,
+    "train_function": adapsnn_train_agent,
     "params_predict": {},
     "params_train": {
     },
@@ -146,10 +140,11 @@ cpa = {
 
 transfer_algorithms = [
     # marwil,
-    cpa
+    # cit,
+    adap
 ]
 
-classical_transfer_experiments = [
+adapt_transfer_experiments = [
     {
         "target_env": medium_env_info,
         "source_model_paths": [
@@ -184,22 +179,22 @@ transfer_experiments = [
             },
         ],
     },
-    # {
-        # "target_env": medium_env_info,
-        # "source_model_paths": [
-            # {
-                # "difficulty": "complex",
-                # "path": str(Path("models") / "{experiment}_{model}_complex"),
-            # },
-        # ],
-    # },
-    # {
-        # "target_env": complex_env_info,
-        # "source_model_paths": [
-            # {
-                # "difficulty": "complex",
-                # "path": str(Path("models") / "{experiment}_{model}_complex"),
-            # },
-        # ],
-    # },
+    {
+        "target_env": medium_env_info,
+        "source_model_paths": [
+            {
+                "difficulty": "complex",
+                "path": str(Path("models") / "{experiment}_{model}_complex"),
+            },
+        ],
+    },
+    {
+        "target_env": complex_env_info,
+        "source_model_paths": [
+            {
+                "difficulty": "complex",
+                "path": str(Path("models") / "{experiment}_{model}_complex"),
+            },
+        ],
+    },
 ]

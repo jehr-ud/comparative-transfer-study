@@ -330,7 +330,7 @@ class SNNCITgent:
         Take action using a hierarchy:
         1. Follow a long-term plan if one exists and is valid.
         2. If not, create a new plan toward the goal.
-        3. If you can't plan, resort to local, step-by-step decision-making.
+        3. If it can't plan, resort to local, step-by-step decision-making.
         """
         current_pos = tuple(obs)
         valid_actions = self.env.get_possible_actions(current_pos)
