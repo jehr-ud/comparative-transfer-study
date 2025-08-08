@@ -4,59 +4,65 @@ from stable_baselines3 import DQN
 from stable_baselines3 import PPO
 from stable_baselines3 import A2C
 from stable_baselines3.common.callbacks import BaseCallback
-import numpy as np
 
 
 class EpisodeInfoCallback(BaseCallback):
     """
-    Una devolución de llamada personalizada para:
-    1. Registrar la recompensa total de cada episodio.
-    2. Detener el entrenamiento después de N episodios.
-    3. Opcionalmente, imprimir información de cada episodio en la consola.
+    A custom callback to:
+    1. Log the total reward for each episode.
+    2. Stop training after N episodes.
+    3. Optionally, print information about each episode to the console.
 
-    :param n_episodes: El número de episodios en los que entrenar.
-    :param log_to_console: Si es True, imprime la información del episodio.
-    :param verbose: Nivel de verbosidad.
+    :param n_episodes: The number of episodes to train on.
+    :param log_to_console: If True, print the episode information.
+    :param verbose: Verbosity level.
     """
-    def __init__(self, n_episodes: int, log_to_console: bool = True, verbose: int = 0):
+    def __init__(
+        self,
+        n_episodes: int,
+        log_to_console: bool = True,
+        verbose: int = 0
+    ):
         super(EpisodeInfoCallback, self).__init__(verbose)
         self.n_episodes = n_episodes
         self.log_to_console = log_to_console
-        
-        # Contadores y almacenamiento
+
         self.episodes_done = 0
         self.episode_rewards = []
         self.episode_lengths = []
 
     def _on_step(self) -> bool:
         """
-        Este método es llamado en cada paso del entorno.
+        This method is called at every step of the environment.
         """
-        # Itera sobre los 'dones' para manejar entornos vectorizados
+        # Iterate on the 'gifts' for handling vectorized environments
         for i, done in enumerate(self.locals['dones']):
             if done:
                 self.episodes_done += 1
-                
-                # Accede a la información del episodio desde el diccionario 'info'
+
+                # Access episode information from the 'info' dictionary
                 info = self.locals['infos'][i]
-                
+
                 if 'episode' in info:
                     reward = info['episode']['r']
                     length = info['episode']['l']
-                    
+
                     self.episode_rewards.append(reward)
                     self.episode_lengths.append(length)
-                    
-                    if self.log_to_console:
-                        print(f"Episodio {self.episodes_done} terminado. Recompensa: {reward:.2f}, Longitud: {length}")
 
-        # Comprueba si se debe detener el entrenamiento
+                    if self.log_to_console:
+                        print(f"Episode {self.episodes_done} finished")
+                        print(f"Reward: {reward:.2f}, Length: {length}")
+
+        # Check if training should be stopped
         if self.episodes_done >= self.n_episodes:
             if self.verbose > 0:
-                print(f"Deteniendo el entrenamiento: se alcanzaron los {self.n_episodes} episodios.")
-            return False  # Detiene el entrenamiento
+                print(
+                    f"Stopping training: {self.n_episodes} episodes reached."
+                )
+            return False  # Stop training
 
-        return True # Continúa el entrenamiento
+        return True  # Training continues
 
 
 class ClassicalAgent:
@@ -83,7 +89,7 @@ class ClassicalAgent:
         self.algorithm_class = self._get_algorithm_class()
 
     def _get_algorithm_class(self):
-        """Devuelve la clase del algoritmo (PPO, DQN, A2C) sin instanciarla."""
+        """Returns the algorithm class (PPO, etc) without instantiating it."""
         if self.name == "PPO":
             return PPO
         elif self.name == "DQN":
@@ -94,7 +100,7 @@ class ClassicalAgent:
             raise ValueError("Agent not configured.")
 
     def setup_model(self):
-        """Crea una nueva instancia del modelo. Llamar solo para un entrenamiento nuevo."""
+        """Creates a new instance of the model. Call only for new training."""
         print(f"Setting up a new '{self.name}' model...")
         self.model = self.algorithm_class(
             "MlpPolicy",
@@ -105,18 +111,28 @@ class ClassicalAgent:
 
     def train(self, target_episodes: int, max_timesteps: int):
         if self.model is None:
-            raise ValueError("Model is not set up. Call setup_model() or load() first.")
+            raise ValueError(
+                "Model is not set up. Call setup_model() or load() first."
+            )
 
-        # 1. El callback se crea con el número correcto de episodios objetivo.
-        episode_callback = EpisodeInfoCallback(n_episodes=target_episodes, log_to_console=True, verbose=1)
+        # 1. The callback is created
+        # with the correct number of target episodes.
+        episode_callback = EpisodeInfoCallback(
+            n_episodes=target_episodes,
+            log_to_console=True,
+            verbose=1
+        )
 
-        print(f"\nIniciando entrenamiento para {target_episodes} episodios (límite de {max_timesteps} timesteps)...")
+        print(f"\nStarting training for {target_episodes} episodes")
+        print(f"(limit of {max_timesteps} timesteps)...")
+
         self.model.learn(
             total_timesteps=max_timesteps,
             callback=episode_callback
         )
 
-        rewards = episode_callback.episode_rewards if episode_callback.episode_rewards else []
+        rewards = episode_callback.episode_rewards \
+            if episode_callback.episode_rewards else []
         return rewards
 
     def predict(self, obs):
@@ -125,17 +141,20 @@ class ClassicalAgent:
 
     def load(self, path):
         """
-        Carga un modelo desde el disco usando el método de clase correcto.
+        Load a model from disk using the correct class method.
         """
         print(f"Loading model from {path}...")
         self.model = self.algorithm_class.load(
             path,
-            env=self.env_info.get('env')
+            env=self.env_info.get('env'),
+            device='auto'
         )
 
     def save(self, path):
         if self.model is None:
-            raise ValueError("Agent not initialized. Train or load a model first.")
+            raise ValueError(
+                "Agent not initialized. Train or load a model first."
+            )
 
         save_path = Path(path)
         save_path.parent.mkdir(parents=True, exist_ok=True)
@@ -143,7 +162,7 @@ class ClassicalAgent:
         print(f"Model saved to {save_path}")
 
     def stop(self):
-        """Método para cerrar el entorno del agente."""
+        """Method to close the agent environment."""
         if self.model and self.model.get_env():
             print("Closing agent's environment.")
             self.model.get_env().close()

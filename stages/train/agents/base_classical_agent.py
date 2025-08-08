@@ -21,6 +21,28 @@ def get_sb_model_params(model_name, difficulty):
             "complex": {
                 "total_timesteps": 	231_000,
             }
+        },
+        "PPO": {
+            "simple": {
+                "total_timesteps": 63_000,
+            },
+            "medium": {
+                "total_timesteps": 108_000,
+            },
+            "complex": {
+                "total_timesteps": 	231_000,
+            }
+        },
+        "A2C": {
+            "simple": {
+                "total_timesteps": 63_000,
+            },
+            "medium": {
+                "total_timesteps": 108_000,
+            },
+            "complex": {
+                "total_timesteps": 	231_000,
+            }
         }
     }
 
@@ -28,14 +50,17 @@ def get_sb_model_params(model_name, difficulty):
 
 
 def get_episode_targets(difficulty: str) -> int:
-    """Devuelve el número de episodios objetivo según la dificultad."""
+    """Returns the target number of episodes based on difficulty."""
     targets = {
         "simple": 500,
         "medium": 1000,
         "complex": 1500,
     }
     if difficulty not in targets:
-        raise ValueError(f"Dificultad '{difficulty}' no reconocida. Opciones: {list(targets.keys())}")
+        options = list(targets.keys())
+        raise ValueError(
+            f"Difficulty '{difficulty}' not found. Options: {options}"
+        )
     return targets[difficulty]
 
 
@@ -85,7 +110,10 @@ def train_basical_agent(
         print(f"--- Starting Iteration {i}/{max_iterations-1} ---")
         target_episodes = get_episode_targets(difficulty)
 
-        rewards = agent.train(target_episodes=target_episodes, max_timesteps=total_timesteps_per_iteration)
+        rewards = agent.train(
+            target_episodes=target_episodes,
+            max_timesteps=total_timesteps_per_iteration
+        )
 
         save_progress(i + 1, model_name, difficulty, experiment_number)
 

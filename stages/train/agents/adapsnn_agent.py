@@ -1,5 +1,24 @@
 from pathlib import Path
 from agents.adapsnn_agent import PrefrontalCortex
+from stages.utils import (
+    save_progress
+)
+
+
+config = {
+    "simple": {
+        'training_episodes': 500,       # Episodios totales si aprende de cero
+        'identification_episodes': 50   # Episodios para calcular la huella
+    },
+    "medium": {
+        'training_episodes': 1000,       # Episodios totales si aprende de cero
+        'identification_episodes': 100   # Episodios para calcular la huella
+    },
+    "complex": {
+       'training_episodes': 1500,       # Episodios totales si aprende de cero
+       'identification_episodes': 150   # Episodios para calcular la huella
+    }
+}
 
 
 def train_agent(
@@ -23,18 +42,30 @@ def train_agent(
     temp_model_dir.mkdir(parents=True, exist_ok=True)
     final_model_dir.mkdir(parents=True, exist_ok=True)
 
-    pfc = PrefrontalCortex(atlas_path="atlas_cerebral_principal.pkl")
+    pfc: PrefrontalCortex = model_class(
+        atlas_path="models/atlas_cerebral_principal.pkl"
+    )
 
-    training_params = {
-        'training_episodes': 500,       # Episodios totales si aprende de cero
-        'identification_episodes': 30   # Episodios para calcular la huella
-    }
+    cong_diff = config.get(difficulty)
+    identification_episodes = cong_diff.get('identification_episodes')
+    training_episodes = cong_diff.get('training_episodes')
 
-    expert_agent, rewards = pfc.execute_task(
+    pfc.handle_task(
+        f"{model_name}_{env_info.get('name')}",
+        env_info,
+        identification_episodes=identification_episodes
+    )
+
+    expert_agent, rewards = pfc.train_active_agent(
         maze_name=f"{model_name}_{env_info.get('name')}",
-        env_info=env_info,
-        training_episodes=training_params['training_episodes'],
-        identification_episodes=training_params['identification_episodes']
+        training_episodes=training_episodes
+    )
+
+    save_progress(
+        1,
+        model_name,
+        difficulty,
+        experiment_number
     )
 
     print("\n--- SESIÓN DE APRENDIZAJE A LO LARGO DE LA VIDA FINALIZADA ---")

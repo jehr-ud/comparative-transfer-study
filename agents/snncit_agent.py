@@ -432,7 +432,7 @@ class SNNCITgent:
                 loaded_dims = state['maze_dims']
                 current_dims = (self.maze_height, self.maze_width)
                 if loaded_dims != current_dims:
-                    print(f"¡ADVERTENCIA! Dimensiones de laberinto no coinciden.")
+                    print("¡ADVERTENCIA! Dimensiones de laberinto no coinciden.")
             print("Agente SNN cargado exitosamente.")
 
         except Exception as e:

@@ -11,12 +11,21 @@ from agents.adapsnn_agent import PrefrontalCortex as MazeSolver
 
 from stages.train.agents.base_classical_agent import train_basical_agent
 from stages.train.agents.snncit_agent import train_agent as citsnn_train_agent
-from stages.train.agents.adapsnn_agent import train_agent as adapsnn_train_agent
-from environments.visual_maze_env import VisualMazeEnv
+from stages.train.agents.adapsnn_agent import (
+    train_agent as adapsnn_train_agent
+)
+from environments.visual_maze_env import (
+    VisualMazeEnv, NormalizeObs
+)
 
 
 def env_creator(cfg):
     return VisualMazeEnv(cfg)
+
+
+#def env_creator(cfg):
+#    base_env = VisualMazeEnv(cfg)
+#    return NormalizeObs(base_env)
 
 
 simple_env_conf = {
@@ -96,26 +105,22 @@ a2c = {
     "type": "classical",
 }
 
+adap = {
+    "name": "ADAP-SSN",
+    "class": MazeSolver,
+    "train_function": adapsnn_train_agent,
+    "params_predict": {},
+    "params_train": {
+    },
+    "type": "transfer",
+}
+
 classical_algorithms = [
+    adap,
     ppo,
     dqn,
-    a2c
+    a2c,
 ]
-
-
-#marwil = {
-#    "name": "Imitation-MarWil",
-#    "class": ImitationMarWilTransfer,
-#    "train_function": train_imitation_transfer_agent,
-#    "params_predict": {},
-#    "params_train": {
-#        "expert": {
-#            "expert_info": ppo,
-#            "path": str(Path("models") / "{model}_{env}")
-#        },
-#    },
-#    "type": "transfer",
-#}
 
 # Perception-Action Agent
 cit = {
@@ -128,29 +133,27 @@ cit = {
     "type": "transfer",
 }
 
-adap = {
-    "name": "ADAP-SSN",
-    "class": MazeSolver,
-    "train_function": adapsnn_train_agent,
-    "params_predict": {},
-    "params_train": {
-    },
-    "type": "transfer",
-}
 
 transfer_algorithms = [
-    # marwil,
     # cit,
+    ppo,
+    dqn,
+    a2c,
     adap
 ]
 
-adapt_transfer_experiments = [
+simple = "{experiment}_{model}_simple"
+complex = "{experiment}_{model}_medium"
+simple_model = str(Path("models") / simple / simple)
+complex_model = str(Path("models") / complex / complex)
+
+transfer_experiments = [
     {
         "target_env": medium_env_info,
         "source_model_paths": [
             {
                 "difficulty": "simple",
-                "path": str(Path("models") / "{experiment}_{model}_simple" / "{experiment}_{model}_simple"),
+                "path": simple_model,
             }
         ],
     },
@@ -159,41 +162,11 @@ adapt_transfer_experiments = [
         "source_model_paths": [
             {
                 "difficulty": "simple",
-                "path": str(Path("models") / "{experiment}_{model}_simple" / "{experiment}_{model}_simple"),
+                "path": simple_model,
             },
             {
                 "difficulty": "medium",
-                "path": str(Path("models") / "{experiment}_{model}_medium" / "{experiment}_{model}_medium"),
-            },
-        ],
-    },
-]
-
-transfer_experiments = [
-    {
-        "target_env": simple_env_info,
-        "source_model_paths": [
-            {
-                "difficulty": "simple",
-                "path": str(Path("models") / "{experiment}_{model}_simple"),
-            },
-        ],
-    },
-    {
-        "target_env": medium_env_info,
-        "source_model_paths": [
-            {
-                "difficulty": "complex",
-                "path": str(Path("models") / "{experiment}_{model}_complex"),
-            },
-        ],
-    },
-    {
-        "target_env": complex_env_info,
-        "source_model_paths": [
-            {
-                "difficulty": "complex",
-                "path": str(Path("models") / "{experiment}_{model}_complex"),
+                "path": complex_model,
             },
         ],
     },

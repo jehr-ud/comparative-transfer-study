@@ -21,21 +21,20 @@ def load_model(
     Returns:
         model: An instance of the loaded model.
     """
-    # QLearning models require the environment
-    if model_class.__name__ == "QLearning":
-        if env_info is None:
-            raise ValueError("QLearning requires an environment to be loaded.")
-        model = model_class(env_info.get('env'))
-        model.load(model_path)
-        return model
-
     #base_path = f"{model_name}_{difficulty}"
     #load_to = Path(model_path) if model_path else model_path / base_path
     #load_to = load_to.resolve()
 
-    model = model_class(model_name, difficulty, env_info)
-    model.load(model_path)
-    return model
+    print("[DEBUG] loading class:")
+    print(model_class.__name__)
+
+    if model_class.__name__ == "PrefrontalCortex":
+        model = model_class(atlas_path="models/atlas_cerebral_principal.pkl")
+        return model
+    else:
+        model = model_class(model_name, difficulty, env_info)
+        model.load(model_path)
+        return model
 
 
 def get_env_by_name(name, envs):
@@ -50,7 +49,7 @@ TRAINING_CONFIG = {
 
 
 def get_progress_file(model_name, experiment_number, difficulty):
-    return f"progress_train_{experiment_number}_{model_name}_{difficulty}.json"
+    return f"results/advance/progress_train_{experiment_number}_{model_name}_{difficulty}.json"
 
 
 def save_progress(iteration, model_name, difficulty, experiment_number):

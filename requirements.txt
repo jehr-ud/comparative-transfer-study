@@ -1,6 +1,6 @@
 accelerate
 stable-baselines[mpi]
-gymnasium
+gymnasium>=0.29.1
 gymnasium[classic-control]
 shimmy
 gputil

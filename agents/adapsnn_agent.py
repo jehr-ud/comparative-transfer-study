@@ -1,12 +1,11 @@
+from spikingjelly.activation_based import neuron
+from spikingjelly.activation_based.learning import STDPLearner
 import torch
 import torch.nn as nn
 import matplotlib.pyplot as plt
 import numpy as np
-from spikingjelly.activation_based import neuron
-from spikingjelly.activation_based.learning import STDPLearner
+
 import pickle
-
-
 import random
 import os
 from pathlib import Path
@@ -324,6 +323,11 @@ class AdapSNNAgent:
         self.previous_position = None
         self.current_plan = None
 
+    def reset(self):
+        """Resets the agent's state for a new episode."""
+        self.current_plan = None
+        self.previous_position = None
+
     def train(self, epsilon=0.1):
         """Runs a full episode of training and learning."""
         with torch.no_grad():
@@ -466,15 +470,25 @@ class AdapSNNAgent:
         return action_map.get((dy, dx), random.randint(0, 3))
 
 
+def calculate_fingerprint_distance(fp1, fp2):
+    """Calcula la distancia euclidiana entre dos huellas digitales."""
+    return np.linalg.norm(np.array(fp1) - np.array(fp2))
+
+
 class PrefrontalCortex:
     """
-    High-level orchestrator that manages SNNAgent training and evaluation
-    across multiple mazes.
+    Orquestador de alto nivel que gestiona el aprendizaje y la adaptación
+    del agente a través de múltiples tareas.
     """
+
     def __init__(self, atlas_path="snn_atlas.pkl"):
         self.atlas_path = Path(atlas_path)
         self.cerebral_atlas = self._load_atlas()
-        print(f"Cerebral Atlas initialized with {len(self.cerebral_atlas)} known mazes.")
+        self.active_agent = None  # El agente listo para la tarea actual
+        print(
+            f"Cerebral Atlas initialized with {len(self.cerebral_atlas)} "
+            "known mazes."
+        )
 
     def _load_atlas(self):
         if self.atlas_path.exists():
@@ -487,59 +501,111 @@ class PrefrontalCortex:
             pickle.dump(self.cerebral_atlas, f)
         print(f"Cerebral Atlas updated and saved to {self.atlas_path}")
 
-    def calculate_fingerprint_distance(fp1, fp2):
-        """Calculates the Euclidean distance between two fingerprints."""
-        return np.linalg.norm(np.array(fp1) - np.array(fp2))
-
-    def execute_task(self, maze_name, env_info, training_episodes=200, identification_episodes=25):
+    def handle_task(self, maze_name, env_info, identification_episodes=30):
         """
-        Enfrenta a un agente a un laberinto, decidiendo si lo reconoce o lo aprende,
-        y devuelve tanto el agente experto como el historial de recompensas.
+        Prepara a un agente para una nueva tarea usando la jerarquía completa:
+        Reconocimiento, Adaptación (Fine-Tuning), o Aprendizaje desde Cero.
         """
-        print(f"\n--- INICIANDO MISIÓN: Laberinto '{maze_name}' ---")
-        agent = AdapSNNAgent(name=f"agent_{maze_name}", difficulty="custom", env_info=env_info)
+        print(f"\n--- HANDLING NEW TASK: Maze '{maze_name}' ---")
 
-        # <<<< 1. INICIALIZAR LA LISTA DE RECOMPENSAS >>>>
+        # 1. Fase de Identificación con un agente de diagnóstico
+        diag_agent = AdapSNNAgent(
+            name=f"diag_{maze_name}",
+            difficulty=env_info['env'].size,
+            env_info=env_info
+        )
+        print(f"Starting identification phase ({identification_episodes} episodes)...")
+        for _ in range(identification_episodes):
+            diag_agent.train(epsilon=0.95)
+
+        fingerprint = diag_agent.calculate_fingerprint()
+        print(f"Fingerprint for '{maze_name}' calculated: {fingerprint}")
+
+        # 2. Jerarquía de Decisión Estratégica
+        # Nivel 1: Reconocimiento Exacto
+        if fingerprint in self.cerebral_atlas:
+            model_path = self.cerebral_atlas[fingerprint]
+            print(f"CONTEXT RECOGNIZED! Loading expert brain from: {model_path}")
+            # Re-instanciamos el agente con su nombre correcto para cargar
+            self.active_agent = AdapSNNAgent(
+                name=Path(model_path).stem,
+                difficulty=env_info['env'].size,
+                env_info=env_info
+            )
+            self.active_agent.load(load_dir=Path(model_path).parent)
+            print("Expert agent is now active.")
+            return
+
+        # Nivel 2: Transferencia por Similitud (Fine-Tuning)
+        if self.cerebral_atlas:
+            best_match_fp, min_distance = None, float('inf')
+            for known_fp, path_str in self.cerebral_atlas.items():
+                distance = calculate_fingerprint_distance(fingerprint, known_fp)
+                if distance < min_distance:
+                    min_distance = distance
+                    best_match_fp = known_fp
+
+            model_path = self.cerebral_atlas[best_match_fp]
+            print(f"NEW CONTEXT. Most similar brain found (Dist: {min_distance:.2f}).")
+            print(f"Performing 'brain transplant' from: {model_path}")
+
+            # Re-instanciamos el agente con el nombre del *nuevo* laberinto
+            # pero cargamos el cerebro del *donante*.
+            self.active_agent = AdapSNNAgent(
+                name=f"agent_{maze_name}",
+                difficulty=env_info['env'].size,
+                env_info=env_info
+            )
+            self.active_agent.load(load_dir=Path(model_path).parent)
+            print("Brain transplant complete. Agent is ready for fine-tuning.")
+            return
+
+        # Nivel 3: Aprendizaje desde Cero
+        print("Atlas is empty or no similar brain found. Preparing for learning from scratch.")
+        self.active_agent = AdapSNNAgent(
+            name=f"agent_{maze_name}",
+            difficulty=env_info['env'].size,
+            env_info=env_info
+        )
+        print("New agent is ready for training.")
+
+    def train_active_agent(self, maze_name, training_episodes=200):
+        """
+        Ejecuta el bucle de entrenamiento completo para el agente que ya fue preparado.
+        """
+        if not self.active_agent:
+            raise RuntimeError("No active agent. Call handle_task first.")
+
+        print(f"\n--- Starting Training Session for '{maze_name}' ---")
         episode_rewards = []
+        initial_epsilon = 1.0
+        min_epsilon = 0.01
+        epsilon_decay_rate = 0.995
+        current_epsilon = initial_epsilon
 
-        # Fase de Identificación
-        print(f"Iniciando fase de identificación ({identification_episodes} episodios)...")
-        for i in range(identification_episodes):
-            reward = agent.train(epsilon=0.9)
-            # <<<< 2. RECOPILAR LA RECOMPENSA DE CADA EPISODIO >>>>
+        for i in range(training_episodes):
+            current_epsilon = max(min_epsilon, initial_epsilon * (epsilon_decay_rate ** i))
+            reward = self.active_agent.train(current_epsilon)
             episode_rewards.append(reward)
 
-        fingerprint = agent.calculate_fingerprint()
-        print(f"Huella digital del laberinto '{maze_name}' calculada: {fingerprint}")
+        print(f"Training complete for '{maze_name}'.")
 
-        # Consulta al Atlas
-        if fingerprint in self.cerebral_atlas:
-            # CASO A: Laberinto reconocido
-            model_path = self.cerebral_atlas[fingerprint]
-            print(f"¡CONTEXTO RECONOCIDO! Cargando cerebro experto desde: {model_path}")
-            agent.load(load_dir=Path(model_path).parent)
-            print("Cerebro experto cargado. No se requiere más entrenamiento.")
-        else:
-            # CASO B: Laberinto nuevo (con o sin trasplante)
-            print("CONTEXTO NUEVO. Iniciando aprendizaje adaptativo...")
+        # Guardar el cerebro recién entrenado/adaptado y actualizar el Atlas
+        fingerprint = self.active_agent.calculate_fingerprint()
+        expert_dir = self.active_agent.save_path / f"expert_{maze_name}"
+        self.active_agent.save(save_dir=expert_dir)
+        self.cerebral_atlas[fingerprint] = str(expert_dir)
+        self._save_atlas()
 
-            # (Aquí iría tu lógica de 'trasplante' si la implementas)
-            # Por ahora, asumimos que continúa entrenando.
+        return self, episode_rewards
 
-            remaining_episodes = training_episodes - identification_episodes
-            for i in range(remaining_episodes):
-                episode_num = i + identification_episodes
-                epsilon = max(0.01, 1.0 * (0.995 ** episode_num))
-                reward = agent.train(epsilon=epsilon)
-                # <<<< 2. RECOPILAR LA RECOMPENSA DE CADA EPISODIO >>>>
-                episode_rewards.append(reward)
+    def predict(self, obs, **kwargs):
+        """Delega la llamada de predicción al agente activo."""
+        if self.active_agent is None:
+            raise RuntimeError("No active agent. Call handle_task to prepare an agent.")
+        return self.active_agent.predict(obs)
 
-            # Guardar el nuevo cerebro experto y actualizar el Atlas
-            expert_dir = agent.save_path / f"expert_{maze_name}"
-            save_path = Path(expert_dir).resolve()
-            agent.save(save_dir=save_path)
-            self.cerebral_atlas[fingerprint] = str(expert_dir)
-            self._save_atlas()
-
-        # <<<< 3. DEVOLVER AMBOS RESULTADOS >>>>
-        return agent, episode_rewards
+    def reset(self):
+        """Resetea el estado del agente activo."""
+        if self.active_agent:
+            self.active_agent.reset()

@@ -3,6 +3,28 @@ import numpy as np
 import pygame
 
 
+class NormalizeObs(gym.ObservationWrapper):
+    """
+    Escala cada eje x,y a [0,1].
+    """
+    def __init__(self, env):
+        super().__init__(env)
+        self.low = self.env.observation_space.low
+        self.high = self.env.observation_space.high
+        self.observation_space = gym.spaces.Box(
+            low=0.0,
+            high=1.0,
+            shape=self.env.observation_space.shape,
+            dtype=np.float32
+        )
+
+    def observation(self, obs):
+        return (obs - self.low) / (self.high - self.low + 1e-8)
+
+    def __getattr__(self, name):
+        return getattr(self.env, name)
+
+
 class VisualMazeEnv(gym.Env):
     metadata = {"render_modes": ["human"], "render_fps": 5}
 
@@ -103,7 +125,9 @@ class VisualMazeEnv(gym.Env):
         elif action == 3:     # Izquierda
             new_pos[1] -= 1
 
-        print(f"[DEBUG] Agent at {old_pos}, action {action}, new_pos {new_pos}")
+        print(
+            f"[DEBUG] Agent at {old_pos}, action {action}, new_pos {new_pos}"
+        )
 
         self.steps_taken += 1
         timeout = False
@@ -141,6 +165,7 @@ class VisualMazeEnv(gym.Env):
 
         obs = np.array(self.agent_pos, dtype=np.float32)
         print(f"[DEBUG] obs {obs}")
+        print(f"[DEBUG] steps_taken {self.steps_taken} max {self.max_steps}")
 
         return obs, reward, done, timeout, info
 

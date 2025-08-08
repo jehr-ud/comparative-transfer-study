@@ -14,8 +14,11 @@ def evaluate_agent(
     type_algorithms,
     experiment_number: int,
     num_episodes=100,
-    params_predict={}
+    params_predict=None
 ):
+    if not params_predict:
+        params_predict = {}
+
     episode_data = []
     success_count = 0
     convergence_episode = None
@@ -29,7 +32,15 @@ def evaluate_agent(
         step_count = 0
         timeout = False
 
+        if hasattr(model, 'reset') and callable(getattr(model, 'reset')):
+            model.reset()
+
+        print(f"evaluating {model}", model_name)
+        if model_name == "ADAP-SSN":
+            params_predict['env_info'] = env_info
+
         while not done:
+            print("Calling predict with params:", params_predict)
             action = model.predict(obs, **params_predict)
             obs, reward, terminated, truncated, info = env.step(action)
             done = terminated or truncated
@@ -70,7 +81,14 @@ def evaluate_agent(
     )
 
     # Save episode-level data
-    fieldnames = ["Experiment", "Episode", "Reward", "Success", "Timeout", "Steps"]
+    fieldnames = [
+        "Experiment",
+        "Episode",
+        "Reward",
+        "Success",
+        "Timeout",
+        "Steps"
+    ]
     with open(filename, mode='w', newline='') as f:
         writer = csv.DictWriter(f, fieldnames=fieldnames)
         writer.writeheader()
@@ -159,7 +177,14 @@ def evaluate_transfer_learning(
                 target_env
             )
 
-            name_file = f"{experiment_number}_{model_name}_{difficulty}_metrics.csv"
+            experiment = f"{experiment_number}_{model_name}"
+
+            # for trasfer in base line
+            if model_name in ["PPO", "DQN", "A2C"]:
+                loaded_model.learn(total_timesteps=100000)
+                loaded_model.save(f"models/{experiment}_expert_{difficulty}")
+
+            name_file = f"{experiment}_{difficulty}_metrics.csv"
             file = f'results/{type_algorithms}/{name_file}'
 
             metrics = evaluate_agent(
@@ -192,7 +217,8 @@ def evaluate_transfer_learning(
                 except Exception as e:
                     print(f"[ERROR] Could not stop model: {e}")
 
-    filename = f"{experiment_number}_{difficulty}_transfer_evaluation_metrics.csv"
+    path_name = "transfer_evaluation_metrics"
+    filename = f"{experiment_number}_{difficulty}_{path_name}.csv"
     filename = f"results/{type_algorithms}/{filename}"
 
     save_transfer_results(all_results, filename)
@@ -246,7 +272,11 @@ def plot_transfer_metrics(results, type_algorithms, experiment_number):
         plt.legend()
         plt.tight_layout()
         safe_metric = metric.replace(" ", "_").lower()
-        plt.savefig(f'results/{type_algorithms}/{experiment_number}_{safe_metric}_comparison.png')
+        file = "comparison.png"
+        file_name = f"{experiment_number}_{safe_metric}_{file}"
+        plt.savefig(
+            f"results/{type_algorithms}/{file_name}"
+        )
 
 
 def plot_learning_curves(env_name, curves_dict, output_file):

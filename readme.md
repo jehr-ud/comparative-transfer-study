@@ -40,7 +40,7 @@ require python 3.10
 - clone the repo
 ```bash
 git clone url
-cd visual-maze-rl
+cd comparative-transfer-study
 ```
 
 - envoiroment
@@ -64,6 +64,8 @@ Modify this file:
 config/__init__.py
 ```
 
+then run:
+
 ```bash
 python main.py
 ```
@@ -83,6 +85,9 @@ In models/
 ## 🤖 Algorithms Used
 
 - DQN
+- PPO
+- A2C
+- ADAP-SNN
 - CIT-SNN
 
 

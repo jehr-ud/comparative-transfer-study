@@ -10,7 +10,6 @@ from stages.usage import show_agent
 from config import (
     envs,
     classical_algorithms,
-    adapt_transfer_experiments,
     transfer_experiments,
     transfer_algorithms,
 )
@@ -65,14 +64,6 @@ def run_classical_methods(experiment_number):
         experiment_number
     )
 
-    print("🎯 Evaluation of adaptation ...")
-
-    run_transfer_comparation(
-        classical_algorithms,
-        adapt_transfer_experiments,
-        experiment_number
-    )
-
 
 def run_transfer_methods(experiment_number):
     print("🎁 Running transfer methods...")
@@ -84,12 +75,6 @@ def run_transfer_methods(experiment_number):
     )
 
     print("🎯 Evaluation of transfer ...")
-
-    run_transfer_comparation(
-        transfer_algorithms,
-        adapt_transfer_experiments,
-        experiment_number
-    )
 
     run_transfer_comparation(
         transfer_algorithms,
