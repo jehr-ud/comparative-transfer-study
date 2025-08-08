@@ -3,15 +3,12 @@ import shutil
 import json
 
 from stages.comparation import (
-    run_training_and_evaluation,
-    run_transfer_comparation
+    run_training_and_evaluation
 )
 from stages.usage import show_agent
 from config import (
     envs,
     classical_algorithms,
-    classical_transfer_experiments,
-    transfer_experiments,
     transfer_algorithms,
 )
 

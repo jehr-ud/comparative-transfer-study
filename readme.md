@@ -5,32 +5,6 @@ This project implements training, evaluation, for RL algorithms (DQN and CIT-SNN
 
 ---
 
-## 📁 Project Structure
-
-├── agents/
-│ ├── q_learning.py # Training logic for this algorithm
-│
-├── environments/
-│ └── init.py
-│ └── visual_maze_env.py # Custom maze environment definition
-│
-├── stages/
-│ ├── evaluation.py # Evaluation functions
-│ ├── comparation.py # Generate the comparation 
-│ │── train/ # functions to train agents
-│
-├── results/
-├── learning_curves.csv # CSV output with reward curves
-├── learning_curves.png # Plot of learning progress
-├── evaluation_metrics.csv # Evaluation results for transfer learning
-│
-├── models/ # Directory for saved models
-│
-├── main.py # Main training and evaluation runner
-├── requirements.txt # Python dependencies
-├── README.md # You are here
-
-
 ## 🛠️ Installation
 
 require python 3.10
@@ -68,6 +42,16 @@ config/__init__.py
 python main.py
 ```
 
+## How run the five experiments:
+
+run main.py
+
+For DQN, choose classical run type, and train 'y'
+
+For CIT-SNN choose transfer run type, and train 'y'
+
+After the train opcionally can put train in 'n' to show the maze.
+
 ## 📊 Output Artifacts
 
 in folder results:
@@ -78,7 +62,7 @@ in folder results:
 
 In models/ 
 
-– Trained .zip models for each difficulty.
+– Trained models for each difficulty.
 
 ## 🤖 Algorithms Used
 
@@ -97,3 +81,32 @@ See requirements.txt. Key libraries include:
 
 ### 📬 Contact
 For questions, feel free to open an issue or email jehernandezr@udistrital.edu.co
+
+
+## 📁 Project Structure
+```
+├── agents/
+│ ├── base_agent.py # Training logic for this algorithm
+│ ├── ssn_agent.py # it's the Custom Cognitive Architecture
+│
+├── environments/
+│ └── init.py
+│ └── visual_maze_env.py # Custom maze environment definition
+│
+├── stages/
+│ ├── evaluation.py # Evaluation functions
+│ ├── comparation.py # Generate the comparation 
+│ │── train/ # functions to train according with the directory "agents"
+│
+├── results/
+├── learning_curves.csv # CSV output with reward curves
+├── learning_curves.png # Plot of learning progress
+├── evaluation_metrics.csv # Evaluation results for transfer learning
+│
+├── models/ # Directory for saved models
+│
+├── main.py # Main training and evaluation runner
+├── requirements.txt # Python dependencies
+├── requirements-lock.txt # Python dependencies versions
+├── README.md # You are here
+```
