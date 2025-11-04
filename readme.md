@@ -7,6 +7,7 @@ This project implements training, evaluation, for RL algorithms (DQN and CIT-SNN
 
 ## 📁 Project Structure
 
+```
 ├── agents/
 │ ├── q_learning.py # Training logic for this algorithm
 │
@@ -29,7 +30,7 @@ This project implements training, evaluation, for RL algorithms (DQN and CIT-SNN
 ├── main.py # Main training and evaluation runner
 ├── requirements.txt # Python dependencies
 ├── README.md # You are here
-
+```
 
 ## 🛠️ Installation
 
@@ -70,6 +71,9 @@ then run:
 python main.py
 ```
 
+### ✨ Running the experiments
+
+
 ## 📊 Output Artifacts
 
 in folder results:
@@ -93,7 +97,7 @@ In models/
 
 ## 📚 Requirements
 
-See requirements.txt. Key libraries include:
+See requirements.txt. and requirements-lock.txt, Key libraries include:
 
 - stable-baselines3
 - gym

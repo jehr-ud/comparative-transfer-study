@@ -19,7 +19,7 @@ rl-env/
 # Archivos de log y resultados
 *.log
 *.out
-*.csv
+.csv
 *.pkl
 *.json
 

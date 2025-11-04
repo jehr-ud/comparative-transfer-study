@@ -28,13 +28,9 @@ def load_model(
     print("[DEBUG] loading class:")
     print(model_class.__name__)
 
-    if model_class.__name__ == "PrefrontalCortex":
-        model = model_class(atlas_path="models/atlas_cerebral_principal.pkl")
-        return model
-    else:
-        model = model_class(model_name, difficulty, env_info)
-        model.load(model_path)
-        return model
+    model = model_class(model_name, difficulty, env_info)
+    model.load(model_path)
+    return model
 
 
 def get_env_by_name(name, envs):

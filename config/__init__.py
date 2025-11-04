@@ -7,7 +7,7 @@ from agents.base_agent import (
     ClassicalAgent as DQN
 )
 from agents.snncit_agent import SNNCITgent
-from agents.adapsnn_agent import PrefrontalCortex as MazeSolver
+from agents.adapsnn_agent import SNNAgent as MazeSolver
 
 from stages.train.agents.base_classical_agent import train_basical_agent
 from stages.train.agents.snncit_agent import train_agent as citsnn_train_agent
@@ -15,17 +15,12 @@ from stages.train.agents.adapsnn_agent import (
     train_agent as adapsnn_train_agent
 )
 from environments.visual_maze_env import (
-    VisualMazeEnv, NormalizeObs
+    VisualMazeEnv
 )
 
 
 def env_creator(cfg):
     return VisualMazeEnv(cfg)
-
-
-#def env_creator(cfg):
-#    base_env = VisualMazeEnv(cfg)
-#    return NormalizeObs(base_env)
 
 
 simple_env_conf = {
@@ -136,9 +131,9 @@ cit = {
 
 transfer_algorithms = [
     # cit,
-    ppo,
-    dqn,
-    a2c,
+    # ppo,
+    # dqn,
+    # a2c,
     adap
 ]
 
@@ -155,7 +150,7 @@ transfer_experiments = [
                 "difficulty": "simple",
                 "path": simple_model,
             }
-        ],
+        ]
     },
     {
         "target_env": complex_env_info,
@@ -168,6 +163,6 @@ transfer_experiments = [
                 "difficulty": "medium",
                 "path": complex_model,
             },
-        ],
-    },
+        ]
+    }
 ]

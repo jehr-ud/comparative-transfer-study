@@ -35,13 +35,8 @@ def evaluate_agent(
         if hasattr(model, 'reset') and callable(getattr(model, 'reset')):
             model.reset()
 
-        print(f"evaluating {model}", model_name)
-        if model_name == "ADAP-SSN":
-            params_predict['env_info'] = env_info
-
         while not done:
-            print("Calling predict with params:", params_predict)
-            action = model.predict(obs, **params_predict)
+            action = model.predict(obs)
             obs, reward, terminated, truncated, info = env.step(action)
             done = terminated or truncated
             reward = float(reward)

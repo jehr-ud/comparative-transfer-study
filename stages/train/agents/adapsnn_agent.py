@@ -1,28 +1,26 @@
 from pathlib import Path
-from agents.adapsnn_agent import PrefrontalCortex
+from agents.adapsnn_agent import SNNAgent
 from stages.utils import (
+    load_progress,
     save_progress
 )
 
 
 config = {
     "simple": {
-        'training_episodes': 500,       # Episodios totales si aprende de cero
-        'identification_episodes': 50   # Episodios para calcular la huella
+        "total_timesteps": 500,
     },
     "medium": {
-        'training_episodes': 1000,       # Episodios totales si aprende de cero
-        'identification_episodes': 100   # Episodios para calcular la huella
+        "total_timesteps": 1000,
     },
     "complex": {
-       'training_episodes': 1500,       # Episodios totales si aprende de cero
-       'identification_episodes': 150   # Episodios para calcular la huella
+        "total_timesteps": 1500,
     }
 }
 
 
 def train_agent(
-    model_class,
+    model_class: SNNAgent,
     model_name,
     env_info,
     difficulty,
@@ -33,6 +31,8 @@ def train_agent(
     if params_train is None:
         params_train = {}
 
+    agent = None
+
     rewards = []
     save_path = Path(save_path).resolve()
     path_suffix = f"{experiment_number}_{model_name}_{difficulty}"
@@ -42,34 +42,63 @@ def train_agent(
     temp_model_dir.mkdir(parents=True, exist_ok=True)
     final_model_dir.mkdir(parents=True, exist_ok=True)
 
-    pfc: PrefrontalCortex = model_class(
-        atlas_path="models/atlas_cerebral_principal.pkl"
-    )
+    start_iteration = load_progress(model_name, difficulty, experiment_number)
 
-    cong_diff = config.get(difficulty)
-    identification_episodes = cong_diff.get('identification_episodes')
-    training_episodes = cong_diff.get('training_episodes')
+    episode = start_iteration
+    episodes = config.get(difficulty).get('total_timesteps')
+    temporal = f"models/temporal/{experiment_number}"
+    temp_model_file = Path(f"{temporal}_{model_name}")
 
-    pfc.handle_task(
-        f"{model_name}_{env_info.get('name')}",
-        env_info,
-        identification_episodes=identification_episodes
-    )
+    try:
+        agent: SNNAgent = model_class(
+            model_name,
+            difficulty,
+            env_info,
+            save_path=save_path
+        )
+    except Exception as e:
+        print(f"[FATAL ERROR] Could not create the agent: {e}")
+        return None, []
 
-    expert_agent, rewards = pfc.train_active_agent(
-        maze_name=f"{model_name}_{env_info.get('name')}",
-        training_episodes=training_episodes
-    )
+    if start_iteration > 0 and temp_model_file.exists():
+        print(f"[INFO] Loading model from: {temp_model_file}")
+        agent.load(str(temp_model_file))
 
-    save_progress(
-        1,
-        model_name,
-        difficulty,
-        experiment_number
-    )
+    initial_epsilon = 1.0
+    min_epsilon = 0.01
+    epsilon_decay_rate = 0.995
+    current_epsilon = initial_epsilon
 
-    print("\n--- SESIÓN DE APRENDIZAJE A LO LARGO DE LA VIDA FINALIZADA ---")
-    print(f"La Corteza Prefrontal ahora es experta en {len(pfc.cerebral_atlas)} tipos de laberintos.")
-    print("Atlas Cerebral final:", pfc.cerebral_atlas)
+    for episode_num in range(start_iteration, episodes):
+        current_epsilon = max(
+            min_epsilon,
+            initial_epsilon * (epsilon_decay_rate ** episode_num)
+        )
 
-    return expert_agent, rewards
+        reward = agent.train(epsilon=current_epsilon)
+        rewards.append(reward)
+
+        save_progress(
+            episode + 1,
+            model_name,
+            difficulty,
+            experiment_number
+        )
+
+        agent.save(
+            str(temp_model_file)
+        )
+
+        print(f"Episode {episode_num + 1}.")
+        print(f"Epsilon: {current_epsilon:.4f}.")
+        print(f"Reward: {reward}")
+
+        episode += 1
+
+    if agent:
+        try:
+            agent.save(save_dir=final_model_dir)
+        except Exception as save_e:
+            print(f"[❌] Error saving final model: {save_e}")
+
+    return agent, rewards

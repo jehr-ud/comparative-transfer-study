@@ -11,10 +11,10 @@ config = {
         "total_timesteps": 500,
     },
     "medium": {
-        "total_timesteps": 1000,
+        "total_timesteps": 10,
     },
     "complex": {
-        "total_timesteps": 1500,
+        "total_timesteps": 15,
     }
 }
 
@@ -70,7 +70,10 @@ def train_agent(
     current_epsilon = initial_epsilon
 
     for episode_num in range(start_iteration, episodes):
-        current_epsilon = max(min_epsilon, initial_epsilon * (epsilon_decay_rate ** episode_num))
+        current_epsilon = max(
+            min_epsilon,
+            initial_epsilon * (epsilon_decay_rate ** episode_num)
+        )
 
         reward = agent.train(epsilon=current_epsilon)
         rewards.append(reward)
@@ -86,9 +89,10 @@ def train_agent(
             str(temp_model_file)
         )
 
-        print(
-            f"Episode {episode_num + 1}. Epsilon: {current_epsilon:.4f}. Reward: {reward}"
-        )
+        print(f"Episode {episode_num + 1}.")
+        print(f"Epsilon: {current_epsilon:.4f}.")
+        print(f"Reward: {reward}")
+
         episode += 1
 
     if agent:

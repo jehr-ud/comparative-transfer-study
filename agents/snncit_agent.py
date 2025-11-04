@@ -1,6 +1,5 @@
 import torch
 import torch.nn as nn
-import matplotlib.pyplot as plt
 import numpy as np
 from spikingjelly.activation_based import neuron
 from spikingjelly.activation_based.learning import STDPLearner
@@ -18,45 +17,77 @@ class GridCellSystem:
         self.n_grids = n_grids
         self.device = device
 
-        # Pre-calculamos los mapas de activación para acelerar el proceso
-        print("Pre-calculando mapas de activación de Grid Cells...")
+        # Pre-calculate the activation maps to speed up the process
+        print("Pre-calculating Grid Cell Activation Maps...")
         self.activation_maps = self._precompute_maps()
-        print("Mapas de Grid Cells listos.")
+        print("Grid Cell Maps Ready")
 
     def _precompute_maps(self):
-        # Generamos los parámetros de las rejillas
-        scales = np.random.uniform(3, 10, self.n_grids)
-        orientations = np.random.uniform(0, np.pi / 3, self.n_grids)
-        phases = np.random.uniform(0, 2 * np.pi, (self.n_grids, 2))
+        # Generate the grid parameters
+        rng = np.random.default_rng(seed=42)
+        scales = rng.uniform(3, 10, self.n_grids)
+        orientations = rng.uniform(0, np.pi / 3, self.n_grids)
+        phases = rng.uniform(0, 2 * np.pi, (self.n_grids, 2))
 
-        # Creamos un tensor para guardar todos los mapas de activación
+        # A tensor is created to store all the activation maps
         maps = torch.zeros(self.height, self.width, self.n_grids)
 
-        # Creamos una rejilla de coordenadas para todo el laberinto
-        y, x = np.meshgrid(np.arange(self.height), np.arange(self.width), indexing='ij')
+        # A coordinate grid is created for the entire maze
+        y, x = np.meshgrid(
+            np.arange(self.height),
+            np.arange(self.width),
+            indexing='ij'
+        )
         pos_grid = np.stack([y.ravel(), x.ravel()], axis=1)
 
         for k in range(self.n_grids):
-            rot_matrix = np.array([[np.cos(orientations[k]), -np.sin(orientations[k])],
-                                   [np.sin(orientations[k]), np.cos(orientations[k])]])
+            rot_matrix = np.array(
+                [
+                    [np.cos(orientations[k]), -np.sin(orientations[k])],
+                    [np.sin(orientations[k]), np.cos(orientations[k])]
+                ]
+            )
             rotated_grid = (rot_matrix @ pos_grid.T).T
 
-            term1 = np.cos(2 * np.pi * rotated_grid[:, 0] / scales[k] + phases[k, 0])
-            term2 = np.cos(2 * np.pi * (-0.5 * rotated_grid[:, 0] + np.sqrt(3)/2 * rotated_grid[:, 1]) / scales[k] + phases[k, 1])
-            term3 = np.cos(2 * np.pi * (-0.5 * rotated_grid[:, 0] - np.sqrt(3)/2 * rotated_grid[:, 1]) / scales[k] + phases[k, 0])
+            pi2 = 2 * np.pi
 
-            activation = (term1 + term2 + term3).reshape(self.height, self.width)
+            term1 = np.cos(
+                pi2 * rotated_grid[:, 0] / scales[k]
+                + phases[k, 0]
+            )
+
+            term2 = np.cos(
+                pi2 * (
+                    -0.5 * rotated_grid[:, 0]
+                    + np.sqrt(3) / 2 * rotated_grid[:, 1]
+                ) / scales[k]
+                + phases[k, 1]
+            )
+
+            term3 = np.cos(
+                pi2 * (
+                    -0.5 * rotated_grid[:, 0]
+                    - np.sqrt(3) / 2 * rotated_grid[:, 1]
+                ) / scales[k]
+                + phases[k, 0]
+            )
+
+            activation = (term1 + term2 + term3).reshape(
+                self.height,
+                self.width
+            )
             maps[:, :, k] = torch.tensor(activation)
 
         return maps.to(self.device)
 
     def get_grid_cell_input(self, pos):
-        # Ahora es una búsqueda súper rápida en el mapa pre-calculado
+        # Now it's a super-fast lookup in the precomputed map
         y, x = int(pos[0]), int(pos[1])
-        # Sumamos las activaciones de todas las rejillas para la posición (y, x)
+
+        # Sum the activations of all grids for the position (y, x)
         total_grid_activation = torch.sum(self.activation_maps[y, x, :])
 
-        # Solo consideramos activaciones positivas y normalizamos
+        # Only consider positive activations and normalize
         return max(0, total_grid_activation.item()) / self.n_grids
 
 
@@ -71,34 +102,43 @@ class SNNCITgent:
         self.save_path = Path(save_path)
         os.makedirs(self.save_path, exist_ok=True)
 
-        # --- Parámetros de la Simulación SNN ---
-        self.device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
+        # --- SNN Simulation Parameters ---
+        self.device = torch.device(
+            "cuda:0" if torch.cuda.is_available() else "cpu"
+        )
         self.T = 100
         self.input_current = 1.0
 
         # 1. PLACE CELLS
         num_place_cells = self.maze_height * self.maze_width
-        self.place_cells = neuron.LIFNode(tau=2.0, v_threshold=1.0).to(self.device)
+        self.place_cells = neuron.LIFNode(
+            tau=2.0,
+            v_threshold=1.0
+        ).to(self.device)
 
         # 2. SINAPSIS
-        self.synaptic_layer = nn.Linear(num_place_cells, num_place_cells, bias=False).to(self.device)
+        self.synaptic_layer = nn.Linear(
+            num_place_cells,
+            num_place_cells,
+            bias=False
+        ).to(self.device)
         torch.nn.init.constant_(self.synaptic_layer.weight, 0.0)
 
-        # 3. APRENDIZAJE (STDP)
+        # 3. LEARNING (STDP)
         self.stdp_learner = STDPLearner(
             step_mode='s',
-            synapse=self.synaptic_layer,  # Le pasamos la capa sináptica
-            sn=self.place_cells,         # Le pasamos la capa de neuronas post-sinápticas
+            synapse=self.synaptic_layer,  # synaptic layer
+            sn=self.place_cells,         # post-synaptic neuron layer
             tau_pre=2.0,
             tau_post=2.0
         )
 
-        # --- Variables de estado ---
+        # --- State variables ---
         self.last_position = None
         self.previous_position = None
-        self.current_plan = None  # Para guardar el plan a largo plazo
+        self.current_plan = None  # To save the long-term plan
 
-        self.cortical_memory = []  # Lista de rutas consolidadas
+        self.cortical_memory = []  # List of consolidated routes
 
         self.grid_cell_system = GridCellSystem(
             self.maze_height,
@@ -106,7 +146,7 @@ class SNNCITgent:
             device=self.device
         )
 
-        self.reward_bonus = 0.05 # Hiperparámetro para el refuerzo
+        self.reward_bonus = 0.05  # Hiperparámetro para el refuerzo
         self.familiarity = defaultdict(int)
 
     def _pos_to_idx(self, pos):
@@ -137,7 +177,9 @@ class SNNCITgent:
             if neighbor == prev_pos:
                 novelty_score = -1.0
             else:
-                novelty_score = 1 / (1 + self.familiarity.get(neighbor, 0) ** 2)
+                novelty_score = 1 / (
+                    1 + self.familiarity.get(neighbor, 0) ** 2
+                )
             scored_moves.append((novelty_score, action))
 
         scored_moves.sort(key=lambda x: x[0], reverse=True)
@@ -145,7 +187,7 @@ class SNNCITgent:
 
     def reward_boost_path(self, path):
         """Strengthens synaptic connections along a successful path."""
-        print(f"Reforzando sinapsis del camino exitoso (longitud {len(path)})...")
+        print(f"Reinforcing synapses of the successful path ({len(path)})...")
         with torch.no_grad():
             for i in range(len(path) - 1):
                 pos_a = path[i]
@@ -154,10 +196,12 @@ class SNNCITgent:
                 idx_a = self._pos_to_idx(pos_a)
                 idx_b = self._pos_to_idx(pos_b)
 
-                # Reforzamos la conexión A -> B
+                # We strengthen the connection A -> B
                 current_weight = self.synaptic_layer.weight.data[idx_b, idx_a]
-                # Usamos clamp para no superar el máximo (asumimos 1.0)
-                self.synaptic_layer.weight.data[idx_b, idx_a] = torch.clamp(current_weight + self.reward_bonus, max=1.0)
+                # We use clamp to not exceed the maximum (we assume 1.0)
+                self.synaptic_layer.weight.data[idx_b, idx_a] = torch.clamp(
+                    current_weight + self.reward_bonus, max=1.0
+                )
 
     def consolidate(self, path, total_reward):
         """Consolidate a learned route if it was efficient."""
@@ -171,7 +215,7 @@ class SNNCITgent:
         self.cortical_memory.append((path, efficiency))
         self.cortical_memory.sort(key=lambda x: -x[1])
 
-        # Limitamos la cantidad de recuerdos consolidados
+        # We limit the amount of consolidated memories
         if len(self.cortical_memory) > 100:
             self.cortical_memory = self.cortical_memory[:100]
 
@@ -195,15 +239,21 @@ class SNNCITgent:
         if not valid_actions:
             return random.randint(0, 3)
 
+        action_deltas = {
+            0: (-1, 0),  # Above
+            1: (0, 1),  # Right
+            2: (1, 0),  # Below
+            3: (0, -1)  # Left
+        }
+
         for action in valid_actions:
-            action_deltas = {0: (-1, 0), 1: (0, 1), 2: (1, 0), 3: (0, -1)}  # Arriba, Derecha, Abajo, Izquierda
-            # Corrección del mapeo de acciones
+            # Correcting action mapping
             dy, dx = action_deltas[action]
             neighbor_pos = (current_pos[0] + dy, current_pos[1] + dx)
 
-            # <<<< INTEGRATED ANTI-PING-PONG LOGIC >>>>
+            # <<<< ANTI-PING-PONG LOGIC >>>>
             if neighbor_pos == prev_pos:
-                activation_score = -float('inf')  # Se devuelve
+                activation_score = -float('inf')  # It is returned
             else:
                 neighbor_idx = self._pos_to_idx(neighbor_pos)
                 activation_score = downstream_activity[0, neighbor_idx].item()
@@ -222,16 +272,17 @@ class SNNCITgent:
         Use Breadth-First Search (BFS) on the learned semantic map to
         find a path from the start to the goal.
         """
-        print(f"Planificando ruta desde {start_pos} hasta {goal_pos}...")
+        print(f"Planning route from {start_pos} to {goal_pos}...")
 
         start_idx = self._pos_to_idx(start_pos)
         goal_idx = self._pos_to_idx(goal_pos)
 
-        # Obtenemos una versión 'booleana' del mapa sináptico: solo las conexiones fuertes
+        # We get a 'Boolean' version of the synaptic map:
+        # only the strongconnections
         with torch.no_grad():
             adj_matrix = (self.synaptic_layer.weight.data > weight_threshold)
 
-        # Cola para BFS: (índice_actual, [camino_de_índices])
+        # Queue for BFS: (current_index, [index_path])
         queue = deque([(start_idx, [start_idx])])
         visited = {start_idx}
 
@@ -239,15 +290,18 @@ class SNNCITgent:
             current_idx, path_indices = queue.popleft()
 
             if current_idx == goal_idx:
-                # Convertimos el camino de índices a un camino de posiciones
+                # We convert the index path to a position path
                 path_pos = [self._idx_to_pos(i) for i in path_indices]
                 print(f"¡Ruta encontrada! Longitud: {len(path_pos)}")
                 return path_pos
 
-            # Find neighbors: These are the neurons 'j' to which the neuron 'current_idx'
+            # Find neighbors: These are the neurons 'j' to
+            # which the neuron 'current_idx'
             # has a strong connection.
-            # In our weight matrix W[i, j], 'j' is pre-synaptic (from) and 'i' is post-synaptic (to).
-            # The connection from 'current_idx' to 'neighbor_idx' is in W[neighbor_idx, current_idx].
+            # In our weight matrix W[i, j], 'j'
+            # is pre-synaptic (from) and 'i' is post-synaptic (to).
+            # The connection from 'current_idx'
+            # to 'neighbor_idx' is in W[neighbor_idx, current_idx].
             neighbors = torch.where(adj_matrix[:, current_idx])[0]
 
             for neighbor_idx in neighbors:
@@ -257,7 +311,7 @@ class SNNCITgent:
                     new_path = path_indices + [neighbor_idx]
                     queue.append((neighbor_idx, new_path))
 
-        print("No se pudo encontrar una ruta al objetivo.")
+        print("A route to the target could not be found.")
         return None  # no path found
 
     def train(self, epsilon=0.1):
@@ -273,18 +327,20 @@ class SNNCITgent:
             truncated = False
 
             while not (terminated or truncated):
-                grid_input_val = self.grid_cell_system.get_grid_cell_input(self.last_position)
+                grid_input_val = self.grid_cell_system.get_grid_cell_input(
+                    self.last_position
+                )
 
                 self.familiarity[self.last_position] += 1
 
                 current_idx = self._pos_to_idx(self.last_position)
                 num_neurons = self.maze_height * self.maze_width
-                input_current_per_step = torch.zeros(
+                in_curr_step = torch.zeros(
                     num_neurons,
                     device=self.device
                 )
-                input_current_per_step[current_idx] = self.input_current
-                input_current_per_step += grid_input_val
+                in_curr_step[current_idx] = self.input_current
+                in_curr_step += grid_input_val
                 self.place_cells.reset()
                 self.stdp_learner.reset()
                 previous_step_spikes = torch.zeros(
@@ -294,7 +350,7 @@ class SNNCITgent:
                 )
                 for _ in range(self.T):
                     recurrent_input = self.synaptic_layer(previous_step_spikes)
-                    total_input = input_current_per_step.unsqueeze(0) + recurrent_input
+                    total_input = in_curr_step.unsqueeze(0) + recurrent_input
                     current_step_spikes = self.place_cells(total_input)
                     self.stdp_learner.step()
                     previous_step_spikes = current_step_spikes
@@ -306,7 +362,9 @@ class SNNCITgent:
                 )
 
                 # --- Interaction with the environment ---
-                next_obs, reward, terminated, truncated, _ = self.env.step(action)
+                next_obs, reward, terminated, truncated, _ = self.env.step(
+                    action
+                )
                 next_pos = tuple(next_obs)
 
                 total_reward += reward
@@ -316,13 +374,16 @@ class SNNCITgent:
                 self.last_position = next_pos
 
             if terminated:
-                print(f"[OK] Meta alcanzada. Reward: {total_reward}. Pasos: {len(path) - 1}")
+                print("[OK] Goal achieved.")
+                print(f"Reward: {total_reward}.")
+                print(f"Steps: {len(path) - 1}")
                 self.consolidate(path, total_reward)
                 self.reward_boost_path(path)
             else:
                 print(f"[FAIL] No alcanzó la meta. Reward: {total_reward}")
 
-            print(f"Pesos sinápticos máx: {self.synaptic_layer.weight.max().item():.4f}")
+            syn_max = self.synaptic_layer.weight.max().item()
+            print(f"Max synaptic weights: {syn_max:.4f}")
             return total_reward
 
     def predict(self, obs):
@@ -336,14 +397,18 @@ class SNNCITgent:
         valid_actions = self.env.get_possible_actions(current_pos)
 
         # --- STRATEGY 1: Stick to the existing plan ---
-        # If we already have a plan and are still working on it, we stick to it.
+        # If we already have a plan
+        # and are still working on it, we stick to it.
         if self.current_plan and current_pos in self.current_plan:
             idx = self.current_plan.index(current_pos)
             if idx + 1 < len(self.current_plan):
                 next_pos = self.current_plan[idx + 1]
                 action = self.direction_from_to(current_pos, next_pos)
                 if action in valid_actions:
-                    print(f"[Predict] Siguiendo plan: {current_pos} -> {next_pos}")
+                    plan = f"{current_pos} -> {next_pos}"
+                    print(
+                        f"[Predict] Following plan: {plan}"
+                    )
                     self.previous_position = current_pos
                     return action
 
@@ -353,15 +418,21 @@ class SNNCITgent:
 
         # If a plan was found, we tried to follow it immediately
         if self.current_plan and len(self.current_plan) > 1:
-            next_pos = self.current_plan[1] # El siguiente paso después del actual
+            # The next step after the current one
+            next_pos = self.current_plan[1]
             action = self.direction_from_to(current_pos, next_pos)
             if action in valid_actions:
-                print(f"[Predict] Nuevo plan creado. Moviendo: {current_pos} -> {next_pos}")
+                print("New plan created.")
+                print(f"Moving: {current_pos} -> {next_pos}")
                 self.previous_position = current_pos
                 return action
 
-        print("[Predict] No se pudo planificar. Usando decisión local...")
-        action = self.predict_snn_action(current_pos, valid_actions, prev_pos=self.previous_position)
+        print("[Predict] Could not plan. Using local decision...")
+        action = self.predict_snn_action(
+            current_pos,
+            valid_actions,
+            prev_pos=self.previous_position
+        )
 
         self.previous_position = current_pos
         return action
@@ -370,15 +441,20 @@ class SNNCITgent:
         dx = next_pos[0] - current[0]
         dy = next_pos[1] - current[1]
 
-        if dx == 0 and dy == -1: return 0  # arriba
-        if dx == 1 and dy == 0: return 1   # derecha
-        if dx == 0 and dy == 1: return 2   # abajo
-        if dx == -1 and dy == 0: return 3  # izquierda
+        if dx == 0 and dy == -1:
+            return 0  # up
+        if dx == 1 and dy == 0:
+            return 1  # right
+        if dx == 0 and dy == 1:
+            return 2  # down
+        if dx == -1 and dy == 0:
+            return 3  # left
+
         return random.randint(0, 3)
 
     def save(self, save_dir=None):
         """
-        Guarda el estado completo del agente SNN en un directorio específico.
+        Saves the complete state of the SNN agent to a specified directory.
         """
         if save_dir is None:
             save_dir = self.save_path
@@ -386,7 +462,7 @@ class SNNCITgent:
         file_path = Path(save_dir) / f"{self.name}.pth"
         file_path.parent.mkdir(parents=True, exist_ok=True)
 
-        print(f"Guardando estado del agente en {file_path}...")
+        print(f"Saving agent state in {file_path}...")
 
         state = {
             'place_cells_state_dict': self.place_cells.state_dict(),
@@ -414,17 +490,29 @@ class SNNCITgent:
         file_path = file_path / f"{self.name}.pth"
 
         if not Path(file_path).exists():
-            print(f"No se encontró un archivo de guardado en {file_path}. Iniciando agente desde cero.")
+            print(f"No se encontró un archivo de guardado en {file_path}.")
+            print("Starting agent from scratch.")
             return
 
-        print(f"Cargando estado del agente desde {file_path}...")
+        print(f"Loading agent status from {file_path}...")
 
         try:
-            state = torch.load(file_path, map_location=self.device, weights_only=False)
+            state = torch.load(
+                file_path,
+                map_location=self.device,
+                weights_only=False
+            )
 
-            self.place_cells.load_state_dict(state['place_cells_state_dict'])
-            self.synaptic_layer.load_state_dict(state['synaptic_layer_state_dict'])
-            self.stdp_learner.load_state_dict(state['stdp_learner_state_dict'])
+            self.place_cells.load_state_dict(
+                state['place_cells_state_dict']
+            )
+            self.synaptic_layer.load_state_dict(
+                state['synaptic_layer_state_dict']
+            )
+            self.stdp_learner.load_state_dict(
+                state['stdp_learner_state_dict']
+            )
+
             self.cortical_memory = state.get('cortical_memory', [])
             if 'grid_cell_system' in state:
                 self.grid_cell_system = state['grid_cell_system']
@@ -432,8 +520,8 @@ class SNNCITgent:
                 loaded_dims = state['maze_dims']
                 current_dims = (self.maze_height, self.maze_width)
                 if loaded_dims != current_dims:
-                    print("¡ADVERTENCIA! Dimensiones de laberinto no coinciden.")
-            print("Agente SNN cargado exitosamente.")
+                    print("WARNING! Maze dimensions do not match.")
+            print("SNN Agent loaded successfully.")
 
         except Exception as e:
-            print(f"Error al cargar el agente: {e}. Iniciando desde cero.")
+            print(f"Error loading agent: {e}. Starting from scratch.")

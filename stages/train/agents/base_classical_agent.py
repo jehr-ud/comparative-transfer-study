@@ -13,35 +13,35 @@ def get_sb_model_params(model_name, difficulty):
     configs = {
         "DQN": {
             "simple": {
-                "total_timesteps": 63_000,
+                "total_timesteps": 63,
             },
             "medium": {
-                "total_timesteps": 108_000,
+                "total_timesteps": 108,
             },
             "complex": {
-                "total_timesteps": 	231_000,
+                "total_timesteps": 	231,
             }
         },
         "PPO": {
             "simple": {
-                "total_timesteps": 63_000,
+                "total_timesteps": 63,
             },
             "medium": {
-                "total_timesteps": 108_000,
+                "total_timesteps": 108,
             },
             "complex": {
-                "total_timesteps": 	231_000,
+                "total_timesteps": 	231,
             }
         },
         "A2C": {
             "simple": {
-                "total_timesteps": 63_000,
+                "total_timesteps": 63,
             },
             "medium": {
-                "total_timesteps": 108_000,
+                "total_timesteps": 108,
             },
             "complex": {
-                "total_timesteps": 	231_000,
+                "total_timesteps": 	231,
             }
         }
     }
